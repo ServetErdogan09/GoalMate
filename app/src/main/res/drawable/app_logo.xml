@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Arka plan daire -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M100,100m-90,0a90,90 0,1 1,180 0a90,90 0,1 1,-180 0"/>
+    
+    <!-- İç daire -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M100,100m-70,0a70,70 0,1 1,140 0a70,70 0,1 1,-140 0"/>
+    
+    <!-- Merkez simge -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M100,60c-22.1,0 -40,17.9 -40,40s17.9,40 40,40s40,-17.9 40,-40S122.1,60 100,60zM120,105h-15v15c0,2.8 -2.2,5 -5,5s-5,-2.2 -5,-5v-15H80c-2.8,0 -5,-2.2 -5,-5s2.2,-5 5,-5h15V80c0,-2.8 2.2,-5 5,-5s5,2.2 5,5v15h15c2.8,0 5,2.2 5,5S122.8,105 120,105z"/>
+</vector> 

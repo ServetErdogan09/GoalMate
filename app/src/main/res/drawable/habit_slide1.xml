@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Arka plan -->
+    <path
+        android:fillColor="#FFF3E0"
+        android:pathData="M0,0h200v200h-200z"/>
+    
+    <!-- Takvim simgesi -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M160,20H40c-5.5,0 -10,4.5 -10,10v140c0,5.5 4.5,10 10,10h120c5.5,0 10,-4.5 10,-10V30C170,24.5 165.5,20 160,20zM150,160H50V70h100V160zM150,60H50V40h100V60z"/>
+    
+    <!-- Onay işaretleri -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M70,100l10,10l20,-20"/>
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M70,130l10,10l20,-20"/>
+    
+    <!-- Metin çizgileri -->
+    <path
+        android:fillColor="#BDBDBD"
+        android:pathData="M110,95h30v5h-30z"/>
+    <path
+        android:fillColor="#BDBDBD"
+        android:pathData="M110,125h30v5h-30z"/>
+</vector> 

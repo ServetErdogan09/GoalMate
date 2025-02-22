@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Arka plan -->
+    <path
+        android:fillColor="#E8F5E9"
+        android:pathData="M0,0h200v200h-200z"/>
+    
+    <!-- Hedef tahtası -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M100,40c-33.1,0 -60,26.9 -60,60s26.9,60 60,60s60,-26.9 60,-60S133.1,40 100,40zM100,140c-22.1,0 -40,-17.9 -40,-40s17.9,-40 40,-40s40,17.9 40,40S122.1,140 100,140z"/>
+    
+    <!-- İç daireler -->
+    <path
+        android:fillColor="#81C784"
+        android:pathData="M100,60c-22.1,0 -40,17.9 -40,40s17.9,40 40,40s40,-17.9 40,-40S122.1,60 100,60zM100,120c-11,0 -20,-9 -20,-20s9,-20 20,-20s20,9 20,20S111,120 100,120z"/>
+    
+    <!-- Merkez nokta -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M100,90c-5.5,0 -10,4.5 -10,10s4.5,10 10,10s10,-4.5 10,-10S105.5,90 100,90z"/>
+    
+    <!-- Ok -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M160,80l-20,10l20,10z"/>
+</vector> 

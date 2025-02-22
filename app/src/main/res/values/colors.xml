@@ -1,0 +1,88 @@
+<resources>
+    <!-- Temel Renkler -->
+    <color name="siyah">#000000</color>
+    <color name="beyaz">#FCFCFC</color>
+    <color name="scafold">#FAFDFF</color>
+    <color name="gri">#F5F5F5</color>
+    <color name="mavi">#2196F3</color>
+    <color name="turkuaz">#03DAC5</color>
+    <color name="sarı">#FFC107</color>
+    <color name="kırmızı">#FF0000</color>
+    <color name="yeşil">#4CAF50</color>
+    <color name="turuncu">#FF9800</color>
+    <color name="background_color">#F5F5F5</color>
+    <color name="primary_color">#6200EE</color>
+    <color name="acik_mavi">#F0FBFD</color>
+
+
+    <!-- İlerleme Renkleri -->
+    <color name="sarı_ilerleme">#FFFF00</color>
+    <color name="başarılı_alışkanlık">#32CD32</color>
+    <color name="başarılı_alışkanlık2">#8CD979</color>
+    <color name="kırmızı_ilerleme">#F4A7B9</color>
+    <color name="kırmızı_ilerleme2">#FF6F6F</color>
+
+
+    <!-- Arka Plan Renkleri -->
+    <color name="gri_arka_plan">#F5F5F5</color>
+    <color name="beyaz_arka_plan">#FFFFFF</color>
+
+    <color name="yeniekledik">#95CBD5</color>
+    <color name="card_zemin_renk">#FAFAFA </color>
+    <color name="yenirenk">#FDFBF9 </color>
+    <color name="sariarka">#FFFF33 </color>
+
+
+    <!-- Kart Renkleri -->
+    <color name="kart_rengi">#6BB5E6</color>
+    <color name="kart_rengi_koyu">#FF5722</color>
+    <color name="kart_tamamlanan">#4CAF50</color>
+    <color name="kart_arkaplan">#F9F9F9</color>
+
+    <!-- Yazı Renkleri -->
+    <color name="başlık_rengi">#212121</color>
+    <color name="ikinci_başlıklar">#757575</color>
+    <color name="yazı_rengi">#07485B</color>
+    <color name="metin_rengi">#000000</color>
+
+    <!-- Buton Renkleri -->
+    <color name="buton_rengi">#D2AA41</color>
+    <color name="etkileşim_butonu">#6200EA</color>
+    <color name="ekle_buton">#03DAC5</color>
+    <color name="başarı_eklenen_buton">#8BC34A</color>
+    <color name="silme">#757575</color>
+    <color name="eylem_buton">#FF9800</color>
+
+    <!-- Top Bar Renkleri -->
+    <color name="topbar_rengi">#FFF4EB</color>
+    <color name="topbar_koyu">#333333</color>
+
+    <!-- Diğer Renkler -->
+    <color name="seçilen_objeler">#FFC107</color>
+    <color name="hata_rengi">#F44336</color>
+    <color name="ilerleme_çubuğu">#3F51B5</color>
+
+
+
+
+
+    <!-- kullanacağım  Renkler -->
+    <color name="arkaplan">#FDFBF9 </color>
+    <color name="kutu_rengi">#13013F</color>
+    <color name="ilerlemecubugu">#13013F</color>
+    <color name="yazirengi">#2F2A5D</color>
+    <color name="kutubordrengi">#13013F</color>
+    <color name="egzersizrengi">#FFEF9A9A</color>
+    <color name="okumarengi">#FFFFF59D</color>
+    <color name="calismarengi">#FFA5D6A7</color>
+    <color name="suicmerengi">#FF90CAF9</color>
+    <color name="dogarengi">#FFFFCC80</color>
+    <color name="meditasyonrengi">#FFE1BEE7</color>
+    <color name="yildiz">#FFEB3B</color>
+    <color name="pastelkirmizi">#FFe74c3c</color>
+    <color name="yesil">#FF16a085</color>
+
+    <color name="yemekrengi">#F2DBB1</color>
+    <color name="gunlukrengi">#E5C3EE</color>
+    <color name="acikgri">#E0E0E0</color>
+</resources>

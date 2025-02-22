@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Arka plan -->
+    <path
+        android:fillColor="#E3F2FD"
+        android:pathData="M0,0h200v200h-200z"/>
+    
+    <!-- Grafik çubukları -->
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M40,160h30v-40h-30z"/>
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M80,160h30v-80h-30z"/>
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M120,160h30v-60h-30z"/>
+    <path
+        android:fillColor="#2196F3"
+        android:pathData="M160,160h30v-100h-30z"/>
+    
+    <!-- Trend çizgisi -->
+    <path
+        android:strokeColor="#FF5722"
+        android:strokeWidth="4"
+        android:pathData="M40,140 L80,100 L120,120 L160,80"/>
+    
+    <!-- Nokta işaretleri -->
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M40,140m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M80,100m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M120,120m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+    <path
+        android:fillColor="#FF5722"
+        android:pathData="M160,80m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+</vector> 

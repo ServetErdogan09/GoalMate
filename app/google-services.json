@@ -1,0 +1,69 @@
+{
+  "project_info": {
+    "project_number": "175963853393",
+    "firebase_url": "https://goalmate-89fb5-default-rtdb.firebaseio.com",
+    "project_id": "goalmate-89fb5",
+    "storage_bucket": "goalmate-89fb5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:175963853393:android:b394f4af9f0fb4f58bde70",
+        "android_client_info": {
+          "package_name": "com.example.goalmate"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "175963853393-t9vic9k622a8tf1ime4tkl6n36kstcbm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2Klrj2SEOxJ8K1jwK8ptDYig0CrYN-t0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "175963853393-t9vic9k622a8tf1ime4tkl6n36kstcbm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:175963853393:android:6045884875c3df438bde70",
+        "android_client_info": {
+          "package_name": "com.example.yeniproje"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "175963853393-t9vic9k622a8tf1ime4tkl6n36kstcbm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2Klrj2SEOxJ8K1jwK8ptDYig0CrYN-t0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "175963853393-t9vic9k622a8tf1ime4tkl6n36kstcbm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

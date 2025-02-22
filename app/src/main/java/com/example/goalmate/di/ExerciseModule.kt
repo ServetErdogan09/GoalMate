@@ -1,0 +1,101 @@
+package com.example.goalmate.di
+
+import android.content.Context
+import androidx.room.Room
+import com.example.goalmate.data.localdata.AppDatabase
+import com.example.goalmate.data.localdata.CompletedDayDao
+import com.example.goalmate.data.localdata.DaoHabits
+import com.example.goalmate.data.localdata.HabitHistoryDao
+import com.example.goalmate.data.localdata.UserPointsCoinDao
+import com.example.goalmate.data.repository.CompleteDayDaoRepository
+import com.example.goalmate.viewmodel.StarCoinViewModel
+import com.example.goalmate.data.repository.HabitRepository
+import com.example.goalmate.data.repository.HistoryHabitsRepository
+import com.example.goalmate.data.repository.StarCoinRepository
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+
+@Module
+@InstallIn(SingletonComponent::class)
+object ExerciseModule {
+
+        @Provides
+        @Singleton
+        fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+            return Room.databaseBuilder(
+                context,
+                AppDatabase::class.java,
+                "goalmate_dataasee"
+            ).fallbackToDestructiveMigration().build()
+        }
+
+
+        @Provides
+        @Singleton
+        fun provideDao(appDatabase: AppDatabase): DaoHabits {
+            return appDatabase.habitDao()
+        }
+
+
+        @Provides
+        fun provideHabitHistoryDao(database: AppDatabase): HabitHistoryDao {
+            return database.habitHistoryDao()
+        }
+
+        @Provides
+        @Singleton
+        fun provideExerciseRepository(daoHabits: DaoHabits): HabitRepository {
+            return HabitRepository(daoHabits)
+        }
+
+
+        // --------------Tamamlanan günler fonksiyonları--------------
+
+        @Provides
+        @Singleton
+        fun provideCompletedDayDao(appDatabase: AppDatabase): CompletedDayDao {
+            return appDatabase.completedDayDao()
+        }
+
+
+        @Provides
+        @Singleton
+        fun provideCompleteDayRepository(completedDayDao: CompletedDayDao): CompleteDayDaoRepository {
+            return CompleteDayDaoRepository(completedDayDao)
+        }
+
+
+        @Provides
+        @Singleton
+        fun ProvidePointsCoinDao(appDatabase: AppDatabase): UserPointsCoinDao {
+            return appDatabase.userPointsCoinDao()
+        }
+
+
+        @Provides
+        @Singleton
+        fun provideStarCoinRepository(userPointsCoinDao: UserPointsCoinDao): StarCoinRepository {
+            return StarCoinRepository(userPointsCoinDao)
+        }
+
+
+        @Provides
+        @Singleton
+        fun provideHistoryHabitsRepository(habitHistoryDao: HabitHistoryDao): HistoryHabitsRepository {
+            return HistoryHabitsRepository(habitHistoryDao)
+        }
+
+
+        @Provides
+        @Singleton
+        fun provideStarCoinViewModel(starCoinRepository: StarCoinRepository): StarCoinViewModel {
+            return StarCoinViewModel(starCoinRepository)
+
+        }
+
+    }
