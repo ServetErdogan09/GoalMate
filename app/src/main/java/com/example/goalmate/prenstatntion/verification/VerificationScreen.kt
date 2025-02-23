@@ -1,5 +1,6 @@
 package com.example.goalmate.prenstatntion.verification
 
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -13,7 +14,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.example.goalmate.viewmodel.RegisterViewModel
 import com.example.goalmate.viewmodel.VerificationState
-import com.example.yeniproje.R
+import com.example.goalmate.R
 import kotlinx.coroutines.delay
 import com.google.firebase.auth.FirebaseAuth
 
@@ -21,7 +22,8 @@ import com.google.firebase.auth.FirebaseAuth
 fun VerificationScreen(
     navController: NavController,
     viewModel: RegisterViewModel = hiltViewModel(),
-    auth: FirebaseAuth
+    auth: FirebaseAuth,
+    context: Context
 ) {
     val verificationState by viewModel.verificationState.collectAsState()
 
@@ -31,7 +33,7 @@ fun VerificationScreen(
             delay(2000) // 2 saniyede bir kontrol et
             auth.currentUser?.reload()
             if (auth.currentUser?.isEmailVerified == true) {
-                viewModel.saveUserDataAfterVerification() // Email doğrulandığında bilgileri kaydet
+                viewModel.saveUserDataAfterVerification(context) // Email doğrulandığında bilgileri kaydet
                 break
             }
         }

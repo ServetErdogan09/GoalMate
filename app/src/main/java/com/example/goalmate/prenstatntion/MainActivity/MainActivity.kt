@@ -47,7 +47,7 @@ import com.example.goalmate.prenstatntion.ExerciseAdd.AddExerciseAddScreen
 import com.example.goalmate.viewmodel.CompleteDayViewModel
 import com.example.goalmate.viewmodel.HabitViewModel
 import com.example.goalmate.viewmodel.StarCoinViewModel
-import com.example.yeniproje.R
+import com.example.goalmate.R
 import com.example.goalmate.ui.theme.YeniProjeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
@@ -129,22 +129,23 @@ fun ChangingScreen() {
             }
 
             composable(route = "LoginScreen") {
-                LoginScreen(navController = navController)
+                LoginScreen(navController = navController, context = context)
             }
 
             composable(route = "register_screen") {
                 LoginScreen(
                     navController = navController,
-                    initialLoginMode = false
+                    initialLoginMode = false,
+                    context = context
                 )
             }
 
             composable(route = "verification") {
-                VerificationScreen(navController = navController, viewModel = registerViewModel , auth = auth)
+                VerificationScreen(navController = navController, viewModel = registerViewModel , auth = auth, context = context)
             }
 
             composable(route = "HomeScreen") {
-                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel)
+                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context)
             }
 
             composable(

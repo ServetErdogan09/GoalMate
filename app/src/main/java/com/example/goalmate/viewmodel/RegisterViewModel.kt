@@ -1,5 +1,7 @@
 package com.example.goalmate.viewmodel
 
+import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.goalmate.data.localdata.RegistrationData
@@ -17,11 +19,13 @@ import javax.inject.Inject
 import com.example.goalmate.data.RegistrationStep
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.auth.PhoneAuthProvider
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val auth: FirebaseAuth,
-    private val db: FirebaseFirestore
+    private val db: FirebaseFirestore,
+    @ApplicationContext context: Context
 ) : ViewModel() {
     private val _registrationData = MutableStateFlow(RegistrationData())
     val registrationData: StateFlow<RegistrationData> = _registrationData.asStateFlow()
@@ -42,6 +46,41 @@ class RegisterViewModel @Inject constructor(
 
     init {
         checkCurrentUser()
+        getCurrentUser(context)
+    }
+
+    private fun getCurrentUser(context: Context) {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            Log.d("RegisterViewModel", "Current user UID: ${currentUser.uid}")
+
+            // Firebase'den kullanıcı bilgilerini al
+            db.collection("users").document(currentUser.uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    Log.d("RegisterViewModel", "Firestore document: ${document.data}")
+                    
+                    if (document != null && document.exists()) {
+                        val name = document.getString("name")
+                        Log.d("RegisterViewModel", "Retrieved name: $name")
+                        
+                        if (!name.isNullOrEmpty()) {
+                            _registrationData.value = _registrationData.value.copy(name = name)
+                            saveUserNameToPreferences(context, name)
+                            Log.d("RegisterViewModel", "Name updated in RegistrationData: $name")
+                        } else {
+                            Log.d("RegisterViewModel", "Name is null or empty in Firestore")
+                        }
+                    } else {
+                        Log.d("RegisterViewModel", "No document found in Firestore!")
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("RegisterViewModel", "Error fetching data from Firestore!", e)
+                }
+        } else {
+            Log.d("RegisterViewModel", "No user logged in!")
+        }
     }
 
     private fun checkCurrentUser() {
@@ -88,6 +127,12 @@ class RegisterViewModel @Inject constructor(
                 birthMonth = month,
                 birthYear = year
             )
+        }
+    }
+
+    fun updateName(name: String) {
+        _registrationData.update { currentData ->
+            currentData.copy(name = name)
         }
     }
 
@@ -147,8 +192,8 @@ class RegisterViewModel @Inject constructor(
                 }
 
                 // Şifre uzunluğu kontrolü
-                if (password.length < 6) {
-                    _authState.value = AuthState.Error("Şifre en az 6 karakter olmalıdır")
+                if (password.length < 8) {
+                    _authState.value = AuthState.Error("Şifre en az 8 karakter olmalıdır")
                     return@launch
                 }
 
@@ -186,7 +231,7 @@ class RegisterViewModel @Inject constructor(
         _authState.value = AuthState.Error(message)
     }
 
-    fun createUserWithEmailOnly() {
+    fun createUserWithEmailOnly(context: Context) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
@@ -197,10 +242,36 @@ class RegisterViewModel @Inject constructor(
                 val email = registrationData.value.email
                 val password = registrationData.value.password
                 
-                auth.createUserWithEmailAndPassword(email, password).await()
+                // Kullanıcıyı oluştur
+                val result = auth.createUserWithEmailAndPassword(email, password).await()
+                
+                // Kullanıcı oluşturulduktan hemen sonra verileri kaydet
+                result.user?.let { user ->
+                    val userData = hashMapOf(
+                        "email" to registrationData.value.email,
+                        "name" to registrationData.value.name,
+                        "surname" to registrationData.value.surname,
+                        "gender" to registrationData.value.gender,
+                        "birthDate" to "${registrationData.value.birthDay}/${registrationData.value.birthMonth}/${registrationData.value.birthYear}"
+                    )
+                    
+                    try {
+                        // Firestore'a verileri kaydet
+                        db.collection("users").document(user.uid).set(userData).await()
+                        Log.d("RegisterViewModel", "User data saved to Firestore: $userData")
+                        
+                        // Local'e de kaydet
+                        saveUserNameToPreferences(context, registrationData.value.name)
+                    } catch (e: Exception) {
+                        Log.e("RegisterViewModel", "Error saving user data to Firestore", e)
+                    }
+                }
+                
+                // Email doğrulaması gönder
                 auth.currentUser?.sendEmailVerification()?.await()
                 
                 _authState.value = AuthState.VerificationRequired
+                
             } catch (e: Exception) {
                 val errorMessage = when {
                     e.message?.contains("email address is already in use") == true -> 
@@ -218,27 +289,53 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    // Email doğrulaması sonrası kullanıcı bilgilerini kaydetme
-    fun saveUserDataAfterVerification() {
+    // Kullanıcı kayıt olduktan sonra verileri kaydet
+    fun saveUserDataAfterVerification(context: Context) {
         viewModelScope.launch {
             try {
                 val userId = auth.currentUser?.uid
                 if (userId != null) {
-                    val userData = hashMapOf(
-                        "email" to registrationData.value.email,
-                        "name" to registrationData.value.name,
-                        "surname" to registrationData.value.surname,
-                        "gender" to registrationData.value.gender,
-                        "birthDate" to "${registrationData.value.birthDay}/${registrationData.value.birthMonth}/${registrationData.value.birthYear}"
-                    )
-                    
-                    db.collection("users").document(userId).set(userData).await()
+                    // Verilerin zaten kaydedilmiş olması gerekiyor, sadece kontrol edelim
+                    db.collection("users").document(userId).get().await().let { document ->
+                        if (!document.exists()) {
+                            // Eğer veriler kayıtlı değilse tekrar kaydet
+                            val userData = hashMapOf(
+                                "email" to registrationData.value.email,
+                                "name" to registrationData.value.name,
+                                "surname" to registrationData.value.surname,
+                                "gender" to registrationData.value.gender,
+                                "birthDate" to "${registrationData.value.birthDay}/${registrationData.value.birthMonth}/${registrationData.value.birthYear}"
+                            )
+                            db.collection("users").document(userId).set(userData).await()
+                        }
+                    }
                     _authState.value = AuthState.Success
                 }
             } catch (e: Exception) {
                 _authState.value = AuthState.Error(e.message ?: "Kullanıcı bilgileri kaydedilemedi")
             }
         }
+    }
+
+
+    fun saveUserNameToPreferences(context: Context, userName: String) {
+        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        with(sharedPreferences.edit()) {
+            putString("user_name", userName)
+            apply()
+        }
+    }
+
+
+    fun getUserNameFromPreferences(context: Context): String {
+        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        return sharedPreferences.getString("user_name", "Misafir") ?: "Misafir"
+    }
+
+
+    fun clearUserPreferences(context: Context) {
+        val sharedPreferences = context.getSharedPreferences("UserPrefs", Context.MODE_PRIVATE)
+        sharedPreferences.edit().clear().apply()
     }
 }
 

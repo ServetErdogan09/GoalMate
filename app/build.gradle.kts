@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.yeniproje"
+    namespace = "com.example.goalmate"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.yeniproje"
+        applicationId = "com.example.goalmate"
         minSdk = 24
         targetSdk = 35
         versionCode = 1
@@ -80,6 +80,6 @@ dependencies {
 
     implementation("com.google.dagger:hilt-android:2.51.1")
     kapt("com.google.dagger:hilt-android-compiler:2.51.1")
-
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+
 }

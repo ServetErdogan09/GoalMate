@@ -80,7 +80,8 @@ import com.example.goalmate.prenstatntion.ExerciseAdd.finishDate
 import com.example.goalmate.viewmodel.CompleteDayViewModel
 import com.example.goalmate.viewmodel.HabitViewModel
 import com.example.goalmate.viewmodel.StarCoinViewModel
-import com.example.yeniproje.R
+import com.example.goalmate.R
+import com.example.goalmate.viewmodel.RegisterViewModel
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
@@ -96,8 +97,11 @@ fun HomeScreen(
     navController: NavController,
     viewModel: HabitViewModel = viewModel(),
     starCoinViewModel: StarCoinViewModel = viewModel(),
-    completeDayViewModel: CompleteDayViewModel
+    completeDayViewModel: CompleteDayViewModel,
+    registerViewModel: RegisterViewModel = viewModel(),
+    context: Context
 ) {
+
     val uiState by viewModel.uiState.collectAsState()
     val habits = remember(uiState) {
         when (uiState) {
@@ -105,6 +109,10 @@ fun HomeScreen(
             else -> emptyList()
         }
     }
+
+    val userName = registerViewModel.getUserNameFromPreferences(context = context )
+
+    Log.e("userName","userName : $userName")
 
     var starIconPosition by remember { mutableStateOf(Offset.Zero) }
 
@@ -222,7 +230,7 @@ fun HomeScreen(
                             // Hoş Geldin Mesajı
                             Column {
                                 Text(
-                                    text = "Servet",
+                                    text = userName,
                                     color = colorResource(R.color.yazirengi),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp

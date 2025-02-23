@@ -33,7 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.ui.text.font.FontWeight
-import com.example.yeniproje.R
+import com.example.goalmate.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

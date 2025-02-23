@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.goalmate.data.localdata.Habit
 import com.example.goalmate.viewmodel.HabitViewModel
-import com.example.yeniproje.R
+import com.example.goalmate.R
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset

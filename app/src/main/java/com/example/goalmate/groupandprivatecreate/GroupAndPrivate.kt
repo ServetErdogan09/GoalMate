@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.yeniproje.R
+import com.example.goalmate.R
 import com.example.goalmate.data.localdata.HabitHistory
 import com.example.goalmate.viewmodel.HabitViewModel
 import java.time.Instant

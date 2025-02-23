@@ -1,5 +1,7 @@
 package com.example.goalmate.prenstatntion.login
 
+import android.content.Context
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -25,7 +27,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 
 
-import com.example.yeniproje.R
+import com.example.goalmate.R
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -35,13 +37,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 
 @Composable
 fun LoginScreen(
     navController: NavController,
     viewModel: RegisterViewModel = hiltViewModel(),
-    initialLoginMode: Boolean = true
+    initialLoginMode: Boolean = true,
+    context: Context
 ) {
     var isLoginMode by remember {
         mutableStateOf(initialLoginMode)
@@ -101,7 +105,7 @@ fun LoginScreen(
             else -> when (currentStep) {
                 RegistrationStep.EMAIL_PASSWORD -> EmailPasswordStep(viewModel)
                 RegistrationStep.PERSONAL_INFO -> PersonalInfoStep(viewModel)
-                RegistrationStep.BIRTH_DATE -> BirthDateStep(viewModel)
+                RegistrationStep.BIRTH_DATE -> BirthDateStep(viewModel, context =context )
             }
         }
 
@@ -263,6 +267,7 @@ fun LoginContent(viewModel: RegisterViewModel, navController: NavController) {
 fun EmailPasswordStep(viewModel: RegisterViewModel) {
     val registrationData by viewModel.registrationData.collectAsState()
     var isValid by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -296,6 +301,24 @@ fun EmailPasswordStep(viewModel: RegisterViewModel) {
                     style = MaterialTheme.typography.titleLarge,
                     color = colorResource(R.color.yazirengi),
                     modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                OutlinedTextField(
+                    value = registrationData.name,
+                    onValueChange = {
+                        viewModel.clearError()
+                        viewModel.updateName(it)
+                        Log.d("EmailPasswordStep", "Name updated: $it")
+                    },
+                    label = { Text("Kullanıcı Adı") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    shape = MaterialTheme.shapes.small,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
                 )
 
                 OutlinedTextField(
@@ -335,7 +358,11 @@ fun EmailPasswordStep(viewModel: RegisterViewModel) {
 
         Button(
             onClick = { 
-                if (isValid) viewModel.moveToNextStep() 
+                if (isValid) {
+                    Log.d("EmailPasswordStep", "Saving name: ${registrationData.name}")
+                    viewModel.saveUserNameToPreferences(context, registrationData.name)
+                    viewModel.moveToNextStep() 
+                }
             },
             enabled = isValid,
             modifier = Modifier
@@ -361,8 +388,10 @@ fun EmailPasswordStep(viewModel: RegisterViewModel) {
             }
         }
 
-        LaunchedEffect(registrationData.email, registrationData.password) {
-            isValid = registrationData.email.contains("@gmail.com") && registrationData.password.length >= 8
+        LaunchedEffect(registrationData.email, registrationData.password, registrationData.name) {
+            isValid = registrationData.email.contains("@gmail.com") && 
+                     registrationData.password.length >= 8 &&
+                     registrationData.name.isNotBlank()
         }
     }
 }
@@ -542,7 +571,7 @@ fun PersonalInfoStep(viewModel: RegisterViewModel) {
 }
 
 @Composable
-fun BirthDateStep(viewModel: RegisterViewModel) {
+fun BirthDateStep(viewModel: RegisterViewModel,context: Context) {
     val registrationData by viewModel.registrationData.collectAsState()
     var isValid by remember { mutableStateOf(false) }
     val authState by viewModel.authState.collectAsState()
@@ -664,7 +693,14 @@ fun BirthDateStep(viewModel: RegisterViewModel) {
             onClick = { 
                 viewModel.clearError()
                 if (isValid) {
-                    viewModel.createUserWithEmailOnly()
+                    // Önce doğum tarihi bilgilerini güncelle
+                    viewModel.updateBirthDate(
+                        registrationData.birthDay,
+                        registrationData.birthMonth,
+                        registrationData.birthYear
+                    )
+                    // Sonra kullanıcı oluştur ve verileri kaydet
+                    viewModel.createUserWithEmailOnly(context =context )
                 } else {
                     when {
                         registrationData.birthDay.isEmpty() || registrationData.birthMonth.isEmpty() || registrationData.birthYear.isEmpty() -> {
