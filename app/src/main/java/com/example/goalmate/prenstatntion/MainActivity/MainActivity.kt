@@ -43,7 +43,7 @@ import androidx.navigation.navArgument
 import com.example.goalmate.groupandprivatecreate.GroupAndPrivate
 import com.example.goalmate.prenstatntion.AnalysisScreen.AnalysisScreen
 import com.example.goalmate.prenstatntion.homescreen.HomeScreen
-import com.example.goalmate.prenstatntion.ExerciseAdd.AddExerciseAddScreen
+import com.example.goalmate.prenstatntion.ExerciseAdd.AddHabitScreen
 import com.example.goalmate.viewmodel.CompleteDayViewModel
 import com.example.goalmate.viewmodel.HabitViewModel
 import com.example.goalmate.viewmodel.StarCoinViewModel
@@ -110,11 +110,11 @@ fun ChangingScreen() {
         bottomBar = {
             val currentBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = currentBackStackEntry?.destination?.route
-            if (
+            if (!currentRoute.isNullOrBlank() &&
+                !currentRoute.startsWith("AddHabitScreen") &&
                 currentRoute != "login" &&
                 currentRoute != "verification" &&
-                currentRoute != "AddExerciseAddScreen" &&
-                currentRoute != "AnalysisScreen"  &&
+                currentRoute != "AnalysisScreen" &&
                 currentRoute != "LoginScreen" &&
                 currentRoute != "register_screen" &&
                 currentRoute != "WelcomeScreen"
@@ -149,7 +149,7 @@ fun ChangingScreen() {
             }
 
             composable(
-                route = "AddExerciseAddScreen?isGroup={isGroup}",
+                route = "AddHabitScreen?isGroup={isGroup}",
                 arguments = listOf(
                     navArgument("isGroup") {
                         type = NavType.BoolType
@@ -159,7 +159,7 @@ fun ChangingScreen() {
             ) { backStackEntry ->
                 val isGroup = backStackEntry.arguments?.getBoolean("isGroup") ?: false
                 Log.e("isGroup", "Received isGroup: $isGroup")
-                AddExerciseAddScreen(navController = navController, habitViewModel, isGroup)
+                AddHabitScreen(navController = navController, habitViewModel, isGroup)
             }
 
             composable(route = "GroupAndPrivate") {

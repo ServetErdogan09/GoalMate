@@ -38,7 +38,7 @@ import java.time.format.DateTimeFormatter
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun AddExerciseAddScreen(
+fun AddHabitScreen(
     navController: NavController,
     habitViewModel: HabitViewModel,
     isGroup: Boolean

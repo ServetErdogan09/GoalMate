@@ -91,7 +91,7 @@ import java.time.format.DateTimeFormatter
                             )
                             .clickable {
                                 isGroup = true
-                                navController.navigate("AddExerciseAddScreen?isGroup=$isGroup")
+                                navController.navigate("AddHabitScreen?isGroup=$isGroup")
                                 Log.e("Navigation", "Navigating to AddExerciseAddScreen with isGroup=$isGroup")},
                         elevation = CardDefaults.cardElevation(4.dp)
 
@@ -132,7 +132,7 @@ import java.time.format.DateTimeFormatter
                             )
                             .clickable {
                                 isGroup = false
-                                navController.navigate("AddExerciseAddScreen?isGroup=$isGroup"
+                                navController.navigate("AddHabitScreen?isGroup=$isGroup"
                                 )                        },
                         elevation = CardDefaults.cardElevation(4.dp)
                     ) {
