@@ -51,6 +51,7 @@ import com.example.goalmate.R
 import com.example.goalmate.ui.theme.YeniProjeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
+import com.example.goalmate.prenstatntion.ProfilScreen.ProfileScreen
 import com.example.goalmate.prenstatntion.login.LoginScreen
 import com.example.goalmate.viewmodel.RegisterViewModel
 import com.example.goalmate.prenstatntion.verification.VerificationScreen
@@ -114,8 +115,9 @@ fun ChangingScreen() {
                 !currentRoute.startsWith("AddHabitScreen") &&
                 currentRoute != "login" &&
                 currentRoute != "verification" &&
-                currentRoute != "AnalysisScreen" &&
+                !currentRoute.startsWith("AnalysisScreen") &&
                 currentRoute != "LoginScreen" &&
+                currentRoute != "ProfileScreen" &&
                 currentRoute != "register_screen" &&
                 currentRoute != "WelcomeScreen"
             ) {
@@ -131,6 +133,13 @@ fun ChangingScreen() {
             composable(route = "LoginScreen") {
                 LoginScreen(navController = navController, context = context)
             }
+
+
+            composable(route = "ProfileScreen") {
+                ProfileScreen(navController = navController)
+            }
+
+
 
             composable(route = "register_screen") {
                 LoginScreen(

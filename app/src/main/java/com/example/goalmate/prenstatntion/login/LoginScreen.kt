@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 
 @Composable
@@ -51,6 +53,8 @@ fun LoginScreen(
         mutableStateOf(initialLoginMode)
     }
     val currentStep by viewModel.currentStep.collectAsState(initial = RegistrationStep.EMAIL_PASSWORD)
+    val profileImage by viewModel.profileImage.collectAsState()
+    
 
 
 
@@ -105,7 +109,11 @@ fun LoginScreen(
             else -> when (currentStep) {
                 RegistrationStep.EMAIL_PASSWORD -> EmailPasswordStep(viewModel)
                 RegistrationStep.PERSONAL_INFO -> PersonalInfoStep(viewModel)
-                RegistrationStep.BIRTH_DATE -> BirthDateStep(viewModel, context =context )
+                RegistrationStep.BIRTH_DATE -> BirthDateStep(
+                    viewModel = viewModel, 
+                    context = context,
+                    navController = navController
+                )
             }
         }
 
@@ -117,14 +125,8 @@ fun LoginScreen(
             Text(if (isLoginMode) "Hesabın yok mu? Hesap oluştur" else "Zaten bir hesabın var mı? Oturum Aç")
         }
 
+        // Email doğrulama durumu için kontrol
         when (val state = viewModel.authState.collectAsState().value) {
-            is AuthState.Success -> {
-                LaunchedEffect(Unit) {
-                    navController.navigate("HomeScreen") {
-                        popUpTo("LoginScreen") { inclusive = true }
-                    }
-                }
-            }
             is AuthState.VerificationRequired -> {
                 LaunchedEffect(Unit) {
                     navController.navigate("verification") {
@@ -132,9 +134,32 @@ fun LoginScreen(
                     }
                 }
             }
-            is AuthState.Loading -> {
-                // Loading göstergesi sadece buton içinde gösterilecek
+            
+            is AuthState.ProfileRequired -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate("ProfileScreen") {
+                        popUpTo("LoginScreen") { inclusive = true }
+                    }
+                }
             }
+            
+            is AuthState.Success -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate("HomeScreen") {
+                        popUpTo("LoginScreen") { inclusive = true }
+                    }
+                }
+            }
+            
+            is AuthState.Error -> {
+                Text(
+                    text = (state as AuthState.Error).message,
+                    color = Color.Red,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+            
             else -> {}
         }
     }
@@ -308,7 +333,7 @@ fun EmailPasswordStep(viewModel: RegisterViewModel) {
                     onValueChange = {
                         viewModel.clearError()
                         viewModel.updateName(it)
-                        Log.d("EmailPasswordStep", "Name updated: $it")
+                        Log.d("EmailPasswordStep", "Name updated to: $it")
                     },
                     label = { Text("Kullanıcı Adı") },
                     modifier = Modifier
@@ -357,11 +382,10 @@ fun EmailPasswordStep(viewModel: RegisterViewModel) {
         }
 
         Button(
-            onClick = { 
+            onClick = {
                 if (isValid) {
-                    Log.d("EmailPasswordStep", "Saving name: ${registrationData.name}")
-                    viewModel.saveUserNameToPreferences(context, registrationData.name)
-                    viewModel.moveToNextStep() 
+                    Log.d("EmailPasswordStep", "Saving user data with name: ${registrationData.name}")
+                    viewModel.moveToNextStep()
                 }
             },
             enabled = isValid,
@@ -388,10 +412,14 @@ fun EmailPasswordStep(viewModel: RegisterViewModel) {
             }
         }
 
+        // Validation kontrolü
         LaunchedEffect(registrationData.email, registrationData.password, registrationData.name) {
-            isValid = registrationData.email.contains("@gmail.com") && 
+            isValid = registrationData.email.contains("@") &&
                      registrationData.password.length >= 8 &&
                      registrationData.name.isNotBlank()
+
+            // Validation durumunu logla
+            Log.d("EmailPasswordStep", "Validation state: $isValid")
         }
     }
 }
@@ -439,7 +467,7 @@ fun PersonalInfoStep(viewModel: RegisterViewModel) {
                     onValueChange = {
                         viewModel.clearError()
                         viewModel.updatePersonalInfo(
-                            it, 
+                            it,
                             registrationData.surname,
                             registrationData.gender
                         )
@@ -537,7 +565,15 @@ fun PersonalInfoStep(viewModel: RegisterViewModel) {
 
     Button(
         onClick = { 
-            if (isValid) viewModel.moveToNextStep() 
+            if (isValid) {
+                Log.d("PersonalInfoStep", """
+                    Moving to next step with data:
+                    Name: ${registrationData.name}
+                    Surname: ${registrationData.surname}
+                    Gender: ${registrationData.gender}
+                """.trimIndent())
+                viewModel.moveToNextStep() 
+            }
         },
         enabled = isValid,
         modifier = Modifier
@@ -563,15 +599,22 @@ fun PersonalInfoStep(viewModel: RegisterViewModel) {
         }
     }
 
+    // Validation kontrolü
     LaunchedEffect(registrationData.name, registrationData.surname, registrationData.gender) {
         isValid = registrationData.name.isNotBlank() && 
                  registrationData.surname.isNotBlank() && 
                  registrationData.gender.isNotBlank()
+        
+        Log.d("PersonalInfoStep", "Validation state: $isValid")
     }
 }
 
 @Composable
-fun BirthDateStep(viewModel: RegisterViewModel,context: Context) {
+fun BirthDateStep(
+    viewModel: RegisterViewModel,
+    context: Context,
+    navController: NavController
+) {
     val registrationData by viewModel.registrationData.collectAsState()
     var isValid by remember { mutableStateOf(false) }
     val authState by viewModel.authState.collectAsState()
@@ -690,17 +733,10 @@ fun BirthDateStep(viewModel: RegisterViewModel,context: Context) {
         }
 
         Button(
-            onClick = { 
+            onClick = {
                 viewModel.clearError()
                 if (isValid) {
-                    // Önce doğum tarihi bilgilerini güncelle
-                    viewModel.updateBirthDate(
-                        registrationData.birthDay,
-                        registrationData.birthMonth,
-                        registrationData.birthYear
-                    )
-                    // Sonra kullanıcı oluştur ve verileri kaydet
-                    viewModel.createUserWithEmailOnly(context =context )
+                    viewModel.createUserWithEmailOnly(context)
                 } else {
                     when {
                         registrationData.birthDay.isEmpty() || registrationData.birthMonth.isEmpty() || registrationData.birthYear.isEmpty() -> {
@@ -728,6 +764,51 @@ fun BirthDateStep(viewModel: RegisterViewModel,context: Context) {
             } else {
                 Text("Kayıt Ol")
             }
+        }
+
+        // Email doğrulama durumu için kontrol
+        when (authState) {
+            is AuthState.VerificationRequired -> {
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        delay(2000) // 2 saniye bekle
+                        viewModel.checkEmailVerification { isVerified ->
+                            if (isVerified) {
+                                navController.navigate("ProfileScreen") {
+                                    popUpTo("LoginScreen") { inclusive = true }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            is AuthState.ProfileRequired -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate("ProfileScreen") {
+                        popUpTo("LoginScreen") { inclusive = true }
+                    }
+                }
+            }
+            
+            is AuthState.Success -> {
+                LaunchedEffect(Unit) {
+                    navController.navigate("HomeScreen") {
+                        popUpTo("LoginScreen") { inclusive = true }
+                    }
+                }
+            }
+            
+            is AuthState.Error -> {
+                Text(
+                    text = (authState as AuthState.Error).message,
+                    color = Color.Red,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+            
+            else -> {}
         }
     }
 

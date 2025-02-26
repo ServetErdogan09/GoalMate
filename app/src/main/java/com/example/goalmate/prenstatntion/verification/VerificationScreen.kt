@@ -17,6 +17,9 @@ import com.example.goalmate.viewmodel.VerificationState
 import com.example.goalmate.R
 import kotlinx.coroutines.delay
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.tasks.await
+import android.util.Log
+import com.example.goalmate.data.AuthState
 
 @Composable
 fun VerificationScreen(
@@ -25,25 +28,44 @@ fun VerificationScreen(
     auth: FirebaseAuth,
     context: Context
 ) {
-    val verificationState by viewModel.verificationState.collectAsState()
+    var isVerifying by remember { mutableStateOf(false) }
+    val authState by viewModel.authState.collectAsState()
+    var hasAttemptedSave by remember { mutableStateOf(false) }
 
-    // Periyodik olarak email doğrulama durumunu kontrol et
     LaunchedEffect(Unit) {
         while (true) {
-            delay(2000) // 2 saniyede bir kontrol et
-            auth.currentUser?.reload()
-            if (auth.currentUser?.isEmailVerified == true) {
-                viewModel.saveUserDataAfterVerification(context) // Email doğrulandığında bilgileri kaydet
-                break
-            }
-        }
-    }
-
-    // Başarılı doğrulama durumunda yönlendir
-    LaunchedEffect(verificationState) {
-        if (verificationState is VerificationState.Success) {
-            navController.navigate("HomeScreen") {
-                popUpTo("LoginScreen") { inclusive = true }
+            delay(2000)
+            try {
+                auth.currentUser?.reload()?.await()
+                val user = auth.currentUser
+                if (user?.isEmailVerified == true && !hasAttemptedSave) {
+                    isVerifying = true
+                    hasAttemptedSave = true
+                    Log.d("VerificationScreen", "Email verified, saving user data...")
+                    viewModel.saveUserToFirestore(user.uid, context)
+                }
+                
+                // AuthState'i kontrol et
+                when (authState) {
+                    is AuthState.ProfileRequired -> {
+                        Log.d("VerificationScreen", "Navigation to ProfileScreen")
+                        navController.navigate("ProfileScreen") {
+                            popUpTo("verification") { inclusive = true }
+                        }
+                        break
+                    }
+                    is AuthState.Error -> {
+                        Log.e("VerificationScreen", "Error: ${(authState as AuthState.Error).message}")
+                        isVerifying = false
+                        hasAttemptedSave = false  // Hata durumunda tekrar denemeye izin ver
+                    }
+                    else -> {
+                        Log.d("VerificationScreen", "Waiting for data save completion...")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("VerificationScreen", "Error checking verification status", e)
+                isVerifying = false
             }
         }
     }
@@ -75,27 +97,33 @@ fun VerificationScreen(
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        when (verificationState) {
-            is VerificationState.Loading -> {
-                CircularProgressIndicator(
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-            is VerificationState.Error -> {
-                Text(
-                    (verificationState as VerificationState.Error).message,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-            }
-            else -> {}
+        if (isVerifying) {
+            CircularProgressIndicator(
+                modifier = Modifier.padding(16.dp)
+            )
+            Text(
+                "Doğrulama işlemi devam ediyor...",
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
 
         Button(
-            onClick = { viewModel.resendVerificationCode() },
+            onClick = { 
+                auth.currentUser?.sendEmailVerification()
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Doğrulama Mailini Tekrar Gönder")
+        }
+
+        // Hata durumunu göster
+        if (authState is AuthState.Error) {
+            Text(
+                text = (authState as AuthState.Error).message,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(16.dp),
+                textAlign = TextAlign.Center
+            )
         }
     }
 } 

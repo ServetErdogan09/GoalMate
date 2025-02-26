@@ -77,6 +77,7 @@ class HabitViewModel @Inject constructor(
     init {
         getServerTime()
         getCountActiveHabit()
+        Log.d("Constants", "MAX_HABIT_COUNT değeri: ${MAX_HABIT_COUNT}")
     }
 
 
@@ -181,16 +182,16 @@ class HabitViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val activeCount = repository.getActiveHabitCount()
-                Log.e("habit", "habit eklendi : $habit")
+                Log.d("HabitAdd", "Aktif alışkanlık sayısı: $activeCount, Maksimum limit: $MAX_HABIT_COUNT")
                 if (activeCount >= MAX_HABIT_COUNT) {
+                    Log.e("HabitAdd", "Maksimum limit aşıldı: $activeCount >= $MAX_HABIT_COUNT")
                     _uiState.value = ExerciseUiState.Error("En fazla $MAX_HABIT_COUNT aktif alışkanlık olabilir!")
-                    Log.e("habit", "max 5 geçti")
                     return@launch
                 }
 
                 val habitId = repository.addExercise(habit)
                 habit.id = habitId.toInt()
-
+                Log.d("HabitAdd", "Yeni alışkanlık başarıyla eklendi. ID: $habitId")
                 getExercises()
                 getCountActiveHabit()
 
@@ -202,6 +203,7 @@ class HabitViewModel @Inject constructor(
                     isExpired : ${habit.isExpired}
                 """.trimIndent())
             } catch (e: Exception) {
+                Log.e("HabitAdd", "Hata mesajı: ${e.message}")
                 _uiState.value = ExerciseUiState.Error(e.message ?: "Alışkanlık eklenirken hata oluştu")
             }
         }

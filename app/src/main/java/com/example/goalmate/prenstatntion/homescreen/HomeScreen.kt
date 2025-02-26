@@ -90,6 +90,12 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.derivedStateOf
+import coil.compose.rememberAsyncImagePainter
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -110,8 +116,11 @@ fun HomeScreen(
         }
     }
 
-    val userName = registerViewModel.getUserNameFromPreferences(context = context )
+    val userName by registerViewModel.userName.collectAsState()
+    val profileImage by registerViewModel.profileImage.collectAsState()
 
+
+    Log.e("userName","profileImage : $profileImage")
     Log.e("userName","userName : $userName")
 
     var starIconPosition by remember { mutableStateOf(Offset.Zero) }
@@ -119,7 +128,7 @@ fun HomeScreen(
     val currentTime by viewModel.currentTime.collectAsState()
 
     val totalHabits by viewModel.countActiveHabits.collectAsState()
-    
+
     LaunchedEffect(Unit) {
         viewModel.getCountActiveHabit()
     }
@@ -169,8 +178,39 @@ fun HomeScreen(
         }
     }
 
+    // LazyListState'i tanımla
+    val lazyListState = rememberLazyListState()
+    
+
+    val isScrollingUp = remember {
+        derivedStateOf {
+            lazyListState.firstVisibleItemIndex == 0 || 
+            lazyListState.firstVisibleItemScrollOffset == 0 ||
+            lazyListState.isScrollInProgress.not()
+        }
+    }
+
+    // Ekran açıldığında profil verilerini yenile
+    LaunchedEffect(Unit) {
+        registerViewModel.getCurrentUser(context)
+    }
+
+    // Profil resmi değiştiğinde log atalım
+    LaunchedEffect(profileImage) {
+        Log.d("HomeScreen", "Profil resmi güncellendi: $profileImage")
+    }
+
     Scaffold(
-        containerColor = colorResource(R.color.arkaplan)
+        containerColor = colorResource(R.color.arkaplan),
+        bottomBar = {
+            AnimatedVisibility(
+                visible = isScrollingUp.value,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it })
+            ) {
+
+            }
+        }
     ) { innerPadding ->
 
         Box(Modifier.fillMaxSize()){
@@ -216,11 +256,27 @@ fun HomeScreen(
                         ) {
                             // Profil Resmi
                             Image(
-                                painter = painterResource(R.drawable.man),
+                                painter = when {
+                                    profileImage.isNotEmpty() -> {
+                                        when {
+                                            profileImage.startsWith("http") || profileImage.startsWith("content") -> {
+                                                rememberAsyncImagePainter(
+                                                    model = profileImage,
+                                                    error = painterResource(R.drawable.personel)
+                                                )
+                                            }
+                                            else -> {
+                                                // Resource ID kontrolünü Composable dışında yapıyoruz
+                                                painterResource(getProfilePainter(profileImage, R.drawable.personel))
+                                            }
+                                        }
+                                    }
+                                    else -> painterResource(R.drawable.personel)
+                                },
                                 contentDescription = "Profile Image",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(50.dp)
+                                    .size(70.dp)
                                     .clip(CircleShape)
                                     .border(2.dp, colorResource(R.color.yazirengi), CircleShape)
                             )
@@ -451,6 +507,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(6.dp))
 
                             LazyColumn(
+                                state = lazyListState,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 8.dp))
@@ -489,7 +546,7 @@ fun HomeScreen(
 
 
 @RequiresApi(Build.VERSION_CODES.O)
-fun isCompletionButtonEnabled(lastCompletedDate: Long?, remainingDays: Long, currentTime: Long): Boolean {
+fun isCompletionButtonEnabled(lastCompletedDate: Long?, remainingDays: Long): Boolean {
     if (remainingDays <= 0) {
         Log.d("ButtonControl", "Alışkanlık süresi dolmuş")
         return false
@@ -552,9 +609,9 @@ fun HabitCard(
 
 
 
-   LaunchedEffect(Unit) {
-      viewModel.calculateRemainingDays(habit,currentTime)
-   }
+    LaunchedEffect(Unit) {
+        viewModel.calculateRemainingDays(habit,currentTime)
+    }
 
 
     var isDialogOpen by remember { mutableStateOf(false) }
@@ -562,7 +619,7 @@ fun HabitCard(
 
     val isButtonEnabled by remember(habit.lastCompletedDate) {
         derivedStateOf {
-            isCompletionButtonEnabled(habit.lastCompletedDate,remainingDays,currentTime)
+            isCompletionButtonEnabled(habit.lastCompletedDate,remainingDays)
         }
     }
 
@@ -726,7 +783,7 @@ fun HabitCard(
                                     return@Checkbox
                                 }
 
-                                val canComplete = isCompletionButtonEnabled(habit.lastCompletedDate, remainingDays, currentTime)
+                                val canComplete = isCompletionButtonEnabled(habit.lastCompletedDate, remainingDays)
                                 Log.d("Checkbox", "Can complete: $canComplete")
 
                                 if (canComplete) {
@@ -786,9 +843,9 @@ fun HabitCard(
                     lastCompletedDate = null,
                     lastResetDate = null
                 )
-                
+
                 viewModel.updateHabit(updateHabit)
-                
+
                 // CompletedDay tablosunu da güncelle
                 completeDayViewModel.updateCompletedDays(
                     habitId = habit.id,
@@ -899,7 +956,7 @@ fun CustomAlertDialog(
             }
         },
         dismissButton = {
-          TextButton(onClick = { onDismiss() }) {
+            TextButton(onClick = { onDismiss() }) {
                 Text("İptal", color = Color.Black)
             }
         }
@@ -1182,3 +1239,14 @@ fun calculateProgress(completedDays: Int, finishMillis : Long, startMillis : Lon
     return if (completedDays > 0)  completedDays.toFloat() / totalDays.toFloat() else  0f
 
 }
+
+
+private fun getProfilePainter(profileImage: String, defaultResId: Int): Int {
+    return try {
+        profileImage.toInt()
+    } catch (e: NumberFormatException) {
+        defaultResId
+    }
+}
+
+

@@ -18,7 +18,7 @@ class HabitRepository @Inject constructor(private val daoHabits: DaoHabits) {
         val activeCount = daoHabits.getActiveHabitCount()
         Log.d("Repository", "Aktif alışkanlık sayısı: $activeCount")
         
-        if (activeCount >= 5) {
+        if (activeCount >= 20) {
             throw Exception("En fazla 5 aktif alışkanlık olabilir!")
         }
 

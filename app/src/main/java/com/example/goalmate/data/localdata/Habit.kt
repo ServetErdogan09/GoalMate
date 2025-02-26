@@ -69,6 +69,7 @@ data class CompletedDay(
 )
 data class RegistrationData(
     val email: String = "",
+    val profileImage: String = "",
     val password: String = "",
     val name: String = "",
     val surname: String = "",

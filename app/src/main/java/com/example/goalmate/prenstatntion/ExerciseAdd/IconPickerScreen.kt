@@ -143,7 +143,7 @@ fun IconPickerScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp), // Dikey mesafe
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        iconsByCategory[selectedCategory]?.let { iconList ->
+                            iconsByCategory[selectedCategory]?.let { iconList ->
                             items(iconList.size) { index ->
                                 val iconResId = iconList[index]
                                 IconButton(
