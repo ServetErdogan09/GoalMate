@@ -22,6 +22,20 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.google.firebase.storage.StorageException
+import com.google.firebase.firestore.FirebaseFirestoreException
+import java.io.File
+import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
+import com.cloudinary.android.MediaManager
+import com.example.goalmate.utils.CloudinaryConfig
+import kotlinx.coroutines.Dispatchers
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
@@ -51,6 +65,12 @@ class RegisterViewModel @Inject constructor(
 
     // Firebase Storage referansını ekleyelim
     private val storage = FirebaseStorage.getInstance()
+
+    private val _showPasswordDialog = MutableStateFlow(false)
+    val showPasswordDialog: StateFlow<Boolean> = _showPasswordDialog.asStateFlow()
+
+    private val _tempPassword = MutableStateFlow("")
+    val tempPassword: StateFlow<String> = _tempPassword.asStateFlow()
 
     init {
         _userName.value = getLocalUserName(context)
@@ -185,6 +205,10 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
+
+
+
+    
 
     fun updateName(name: String) {
         Log.d("RegisterViewModel", "Updating name to: $name")
@@ -351,7 +375,15 @@ class RegisterViewModel @Inject constructor(
     fun saveUserToFirestore(userId: String, context: Context) {
         viewModelScope.launch {
             try {
-                Log.d("RegisterViewModel", "Starting to save user data for ID: $userId")
+                // Önce oturum durumunu kontrol et
+                if (auth.currentUser == null) {
+                    Log.e("RegisterViewModel", "User not authenticated")
+                    _authState.value = AuthState.Error("Lütfen tekrar giriş yapın")
+                    return@launch
+                }
+
+                Log.d("RegisterViewModel", "Current user ID: ${auth.currentUser?.uid}")
+                Log.d("RegisterViewModel", "Saving data for user ID: $userId")
                 
                 // SharedPreferences'dan kayıt verilerini al
                 val savedData = getRegistrationDataFromPrefs(context)
@@ -402,65 +434,45 @@ class RegisterViewModel @Inject constructor(
                 
             } catch (e: Exception) {
                 Log.e("RegisterViewModel", "Error saving user data", e)
+                when (e) {
+                    is FirebaseFirestoreException -> {
+                        Log.e("RegisterViewModel", "Firestore error code: ${e.code}")
+                        Log.e("RegisterViewModel", "Firestore error message: ${e.message}")
+                    }
+                    else -> Log.e("RegisterViewModel", "Unexpected error: ${e.message}")
+                }
                 _authState.value = AuthState.Error("Kullanıcı bilgileri kaydedilemedi: ${e.message}")
             }
         }
     }
 
-    // Email doğrulaması tamamlandığında çağrılacak fonksiyon
-    fun updateEmailVerificationStatus(userId: String) {
-        viewModelScope.launch {
-            try {
-                // Firestore'daki kullanıcı verisini güncelle
-                db.collection("users").document(userId)
-                    .update(
-                        mapOf(
-                            "isEmailVerified" to true,
-                            "updatedAt" to System.currentTimeMillis()
-                        )
-                    )
-                    .await()
 
-                // Kullanıcı bilgilerini al ve StateFlow'ları güncelle
-                val userDoc = db.collection("users").document(userId).get().await()
-                userDoc.data?.let { userData ->
-                    _userName.value = userData["name"] as? String ?: "Misafir"
-                }
 
-                // ProfileScreen'e yönlendir
-                _authState.value = AuthState.ProfileRequired
-                
-            } catch (e: Exception) {
-                Log.e("RegisterViewModel", "Error updating email verification status", e)
-                _authState.value = AuthState.Error("Email doğrulama durumu güncellenemedi")
-            }
-        }
-    }
-
+    // updateProfileImage fonksiyonunu güncelleyelim
     fun updateProfileImage(imageUri: String, context: Context) {
         viewModelScope.launch {
             try {
-                Log.d("RegisterViewModel", "Updating profile image: $imageUri")
+                Log.d("RegisterViewModel", "Profil resmi güncelleniyor: $imageUri")
                 
                 val finalImagePath = when {
-                    // Resource ID ise (uygulama içi avatar)
+                    // Avatar seçilmişse (resource ID)
                     imageUri.all { it.isDigit() } -> {
-                        // Avatar seçilmişse direkt resource ID'yi kullan
-                        Log.d("RegisterViewModel", "Avatar selected with resource ID: $imageUri")
-                        imageUri
+                        Log.d("RegisterViewModel", "Avatar seçildi, ID: $imageUri")
+                        imageUri // Resource ID'yi doğrudan kullan
                     }
                     
-                    // URI ise (galeriden seçilen)
+                    // Galeriden resim seçilmişse
                     imageUri.startsWith("content") -> {
-                        Log.d("RegisterViewModel", "Uploading gallery image to Firebase Storage")
-                        // Sadece galeri resimlerini Firebase Storage'a yükle
-                        uploadImageToFirebaseStorage(Uri.parse(imageUri)) ?: run {
-                            Log.e("RegisterViewModel", "Failed to upload image")
+                        Log.d("RegisterViewModel", "Galeri resmi Cloudinary'ye yükleniyor")
+                        uploadImageToCloudinary(context, Uri.parse(imageUri))?.also {
+                            Log.d("RegisterViewModel", "Cloudinary URL: $it")
+                        } ?: run {
+                            Log.e("RegisterViewModel", "Resim yüklenemedi")
                             return@launch
                         }
                     }
                     
-                    // Zaten bir URL ise (önceden yüklenmiş)
+                    // Zaten bir URL ise
                     else -> imageUri
                 }
                 
@@ -472,64 +484,77 @@ class RegisterViewModel @Inject constructor(
                 sharedPreferences.edit().putString("profileImage", finalImagePath).apply()
                 
                 // Firestore'a kaydet
-                val currentUser = auth.currentUser
-                if (currentUser != null) {
-                    val userRef = db.collection("users").document(currentUser.uid)
-                    userRef.update(mapOf(
-                        "profileImage" to finalImagePath,
-                        "lastUpdated" to System.currentTimeMillis()
-                    )).await()
+                auth.currentUser?.let { user ->
+                    db.collection("users").document(user.uid)
+                        .update(mapOf(
+                            "profileImage" to finalImagePath,
+                            "lastUpdated" to System.currentTimeMillis()
+                        )).await()
                     
-                    Log.d("RegisterViewModel", "Profile image updated successfully: $finalImagePath")
+                    Log.d("RegisterViewModel", "Profil resmi başarıyla güncellendi: $finalImagePath")
                 }
                 
             } catch (e: Exception) {
-                Log.e("RegisterViewModel", "Error updating profile image", e)
+                Log.e("RegisterViewModel", "Profil resmi güncellenirken hata oluştu", e)
             }
         }
     }
 
-    // Firebase Storage'a resim yükleme fonksiyonu
-    private suspend fun uploadImageToFirebaseStorage(uri: Uri): String? {
-        return try {
-            val currentUser = auth.currentUser ?: throw Exception("User not authenticated")
-            val timestamp = System.currentTimeMillis()
-            
-            // Dosya yolunu kullanıcı ID'sine göre düzenle
-            val fileName = "profile_images/${currentUser.uid}/profile_${timestamp}.jpg"
-            val storageRef = storage.reference.child(fileName)
-            
-            Log.d("RegisterViewModel", "Starting image upload to: $fileName")
-            
-            // Resmi yükle
-            val uploadTask = storageRef.putFile(uri).await()
-            Log.d("RegisterViewModel", "Image upload completed")
-            
-            // Download URL'ini al
-            val downloadUrl = storageRef.downloadUrl.await()
-            Log.d("RegisterViewModel", "Download URL obtained: ${downloadUrl}")
-            
-            downloadUrl.toString()
-            
-        } catch (e: Exception) {
-            Log.e("RegisterViewModel", "Error uploading image to Firebase Storage", e)
-            when (e) {
-                is StorageException -> {
-                    Log.e("RegisterViewModel", "Storage error code: ${e.errorCode}")
-                    Log.e("RegisterViewModel", "Storage error message: ${e.message}")
+    private suspend fun uploadImageToCloudinary(context: Context, imageUri: Uri): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Cloudinary'i başlat
+                CloudinaryConfig.initCloudinary(context)
+
+                // Yükleme sonucunu beklemek için CompletableDeferred kullan
+                val result = CompletableDeferred<String?>()
+
+                // Yükleme işlemini başlat
+                CloudinaryConfig.getCloudinaryInstance()
+                    .upload(imageUri)
+                    .unsigned("goalmate_preset")
+                    .option("folder", "profile_images")
+                    .callback(object : UploadCallback {
+                        override fun onStart(requestId: String) {
+                            Log.d("Cloudinary", "Yükleme başladı")
+                        }
+
+                        override fun onProgress(requestId: String, bytes: Long, totalBytes: Long) {
+                            val progress = (bytes * 100) / totalBytes
+                            Log.d("Cloudinary", "Yükleme ilerlemesi: $progress%")
+                        }
+
+                        override fun onSuccess(requestId: String, resultData: Map<*, *>) {
+                            val url = resultData["url"] as? String
+                            result.complete(url)
+                            Log.d("Cloudinary", "Yükleme başarılı: $url")
+                        }
+
+                        override fun onError(requestId: String, error: ErrorInfo) {
+                            Log.e("Cloudinary", "Yükleme hatası: ${error.description}")
+                            result.complete(null)
+                        }
+
+                        override fun onReschedule(requestId: String, error: ErrorInfo) {
+                            Log.e("Cloudinary", "Yükleme yeniden planlandı: ${error.description}")
+                        }
+                    })
+                    .dispatch()
+
+                // Sonucu bekle ve döndür
+                try {
+                    withTimeout(30000) { // 30 saniye timeout
+                        result.await()
+                    }
+                } catch (e: Exception) {
+                    Log.e("Cloudinary", "Yükleme timeout veya hata", e)
+                    null
                 }
-                else -> Log.e("RegisterViewModel", "Unexpected error: ${e.message}")
-            }
-            null
-        }
-    }
 
-    private fun saveProfileImageToPreferences(context: Context, imageUri: String) {
-        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        with(sharedPreferences.edit()) {
-            putString("profile_image", imageUri)
-            putString("profileImage", imageUri)  // Her iki key'e de kaydedelim
-            apply()
+            } catch (e: Exception) {
+                Log.e("RegisterViewModel", "Cloudinary yükleme hatası", e)
+                return@withContext null
+            }
         }
     }
 
@@ -544,6 +569,109 @@ class RegisterViewModel @Inject constructor(
                 onVerificationComplete(false)
             }
         }
+    }
+
+
+    private fun deleteUserPref(context: Context){
+        val sharedPreferences =  context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        sharedPreferences.edit().clear().apply()
+    }
+
+    fun updateTempPassword(password: String) {
+        _tempPassword.value = password
+    }
+
+    fun showPasswordConfirmDialog() {
+        _showPasswordDialog.value = true
+    }
+
+    fun hidePasswordConfirmDialog() {
+        _showPasswordDialog.value = false
+        _tempPassword.value = ""
+    }
+
+    fun deleteAccount(context: Context) {
+        viewModelScope.launch {
+            try {
+                _authState.value = AuthState.Loading
+                val user = auth.currentUser
+                
+                if (user != null) {
+                    try {
+                        if (_tempPassword.value.isEmpty()) {
+                            _authState.value = AuthState.Error("Lütfen şifrenizi giriniz")
+                            return@launch
+                        }
+                        
+                        // Kullanıcının girdiği şifre ile kimlik doğrulaması yap
+                        val credential = EmailAuthProvider.getCredential(user.email!!, _tempPassword.value)
+                        user.reauthenticate(credential).await()
+                        
+                        // Kimlik doğrulaması başarılı olduysa hesabı sil
+                        try {
+                            // Önce Firestore verilerini sil
+                            db.collection("users").document(user.uid)
+                                .delete()
+                                .await()
+                            
+                            // SharedPreferences'ı temizle
+                            deleteUserPref(context)
+                            
+                            // Authentication hesabını sil
+                            user.delete().await()
+                            
+                            // StateFlow'ları sıfırla
+                            _userName.value = "Misafir"
+                            _profileImage.value = ""
+                            _tempPassword.value = ""
+                            _authState.value = AuthState.Idle
+                            
+                            // Firebase'den çıkış yap
+                            auth.signOut()
+                            
+                            hidePasswordConfirmDialog()
+                            
+                        } catch (e: Exception) {
+                            Log.e("RegisterViewModel", "Hesap silinirken hata", e)
+                            throw e
+                        }
+                        
+                    } catch (e: FirebaseAuthRecentLoginRequiredException) {
+                        Log.e("RegisterViewModel", "Yeniden kimlik doğrulaması gerekli", e)
+                        _authState.value = AuthState.Error("Güvenlik nedeniyle hesabınızı silmek için lütfen şifrenizi tekrar giriniz")
+                        showPasswordConfirmDialog()
+                    } catch (e: Exception) {
+                        Log.e("RegisterViewModel", "Kimlik doğrulama hatası", e)
+                        _authState.value = AuthState.Error("Hatalı şifre")
+                    }
+                } else {
+                    throw Exception("Oturum açmış kullanıcı bulunamadı")
+                }
+            } catch (e: Exception) {
+                Log.e("RegisterViewModel", "Hesap silme işlemi başarısız", e)
+                _authState.value = AuthState.Error("Hesap silinemedi: ${e.message}")
+            }
+        }
+    }
+
+
+    fun signOut(){
+        try {
+            auth.signOut()
+            _authState.value = AuthState.Idle
+        }catch (e:Exception){
+            Log.e("RegisterViewModel", "Çıkış yapılırken hata oluştu", e)
+            _authState.value = AuthState.Error("Çıkış yapılamadı: ${e.message}")
+        }
+    }
+
+    private fun saveProfileImageToPreferences(context: Context, imageUri: String) {
+        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+        with(sharedPreferences.edit()) {
+            putString("profileImage", imageUri)
+            apply()
+        }
+        Log.d("RegisterViewModel", "Profil resmi SharedPreferences'a kaydedildi: $imageUri")
     }
 }
 

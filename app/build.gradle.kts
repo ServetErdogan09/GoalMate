@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.storage.ktx)
     implementation(libs.firebase.storage)
+    implementation(libs.play.services.cast.tv)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -70,6 +71,7 @@ dependencies {
     implementation ("com.airbnb.android:lottie-compose:6.2.0")
 
 
+    implementation ("com.cloudinary:cloudinary-android:2.3.1") // resimlerimizin depolama alanı olarak kullanacağız
 
     implementation( "androidx.room:room-runtime:2.6.1")
     kapt ("androidx.room:room-compiler:2.6.1")

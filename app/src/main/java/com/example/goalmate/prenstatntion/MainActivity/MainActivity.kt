@@ -52,10 +52,12 @@ import com.example.goalmate.ui.theme.YeniProjeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
 import com.example.goalmate.prenstatntion.ProfilScreen.ProfileScreen
+import com.example.goalmate.prenstatntion.UserScreen.UserScreen
 import com.example.goalmate.prenstatntion.login.LoginScreen
 import com.example.goalmate.viewmodel.RegisterViewModel
 import com.example.goalmate.prenstatntion.verification.VerificationScreen
 import com.example.goalmate.prenstatntion.welcome.WelcomeScreen
+import com.example.goalmate.utils.CloudinaryConfig
 import com.google.firebase.auth.FirebaseAuth
 
 @AndroidEntryPoint
@@ -67,6 +69,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             YeniProjeTheme {
                 ChangingScreen()
+
             }
         }
     }
@@ -83,6 +86,9 @@ fun ChangingScreen() {
     val completeDayViewModel: CompleteDayViewModel = viewModel()
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+
+    // Yeni başlatmayı ekle
+    CloudinaryConfig.initCloudinary(context)
 
     // AuthState'i gözlemle
     val authState by registerViewModel.authState.collectAsState()
@@ -157,6 +163,10 @@ fun ChangingScreen() {
                 HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context)
             }
 
+            composable(route = "UserScreen") {
+                UserScreen(registerViewModel,navController,context)
+            }
+
             composable(
                 route = "AddHabitScreen?isGroup={isGroup}",
                 arguments = listOf(
@@ -220,7 +230,7 @@ fun BottomNavigationBar(navController: NavController) {
             BottomNavItem("Groups", "Groups", R.drawable.groups),
             BottomNavItem("GroupAndPrivate", "Add", R.drawable.add),
             BottomNavItem("Calendar", "Calendar", R.drawable.calendar),
-            BottomNavItem("Profile", "Profile", R.drawable.profil)
+            BottomNavItem("UserScreen", "Profile", R.drawable.profil)
         )
 
         items.forEach { item ->
