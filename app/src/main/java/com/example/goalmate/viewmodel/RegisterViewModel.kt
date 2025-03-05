@@ -3,6 +3,7 @@ package com.example.goalmate.viewmodel
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.goalmate.data.localdata.RegistrationData
@@ -21,27 +22,23 @@ import com.example.goalmate.data.RegistrationStep
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import dagger.hilt.android.qualifiers.ApplicationContext
-import com.google.firebase.storage.StorageException
 import com.google.firebase.firestore.FirebaseFirestoreException
-import java.io.File
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
-import com.cloudinary.android.MediaManager
 import com.example.goalmate.utils.CloudinaryConfig
 import kotlinx.coroutines.Dispatchers
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
+import kotlinx.coroutines.delay
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val auth: FirebaseAuth,
     private val db: FirebaseFirestore,
-    @ApplicationContext context: Context
+    @ApplicationContext private val  context: Context
 ) : ViewModel() {
     private val _registrationData = MutableStateFlow(RegistrationData())
     val registrationData: StateFlow<RegistrationData> = _registrationData.asStateFlow()
@@ -63,8 +60,6 @@ class RegisterViewModel @Inject constructor(
     private val _profileImage = MutableStateFlow<String>("")
     val profileImage: StateFlow<String> = _profileImage.asStateFlow()
 
-    // Firebase Storage referansını ekleyelim
-    private val storage = FirebaseStorage.getInstance()
 
     private val _showPasswordDialog = MutableStateFlow(false)
     val showPasswordDialog: StateFlow<Boolean> = _showPasswordDialog.asStateFlow()
@@ -250,7 +245,7 @@ class RegisterViewModel @Inject constructor(
         _authState.value = AuthState.Idle
     }
 
-    fun login(email: String, password: String) {
+    fun login(email: String, password: String,context: Context) {
         viewModelScope.launch {
             _authState.value = AuthState.Loading
             try {
@@ -270,6 +265,8 @@ class RegisterViewModel @Inject constructor(
                 result.user?.reload()?.await()
                 
                 if (result.user?.isEmailVerified == true) {
+                    // Kullanıcı bilgilerini hemen güncelle
+                    getCurrentUser(context)
                     _authState.value = AuthState.Success
                 } else {
                     result.user?.sendEmailVerification()?.await()
@@ -655,13 +652,36 @@ class RegisterViewModel @Inject constructor(
     }
 
 
-    fun signOut(){
-        try {
-            auth.signOut()
-            _authState.value = AuthState.Idle
-        }catch (e:Exception){
-            Log.e("RegisterViewModel", "Çıkış yapılırken hata oluştu", e)
-            _authState.value = AuthState.Error("Çıkış yapılamadı: ${e.message}")
+    fun signOut(context: Context) {
+        viewModelScope.launch {
+            try {
+                // Önce AuthState'i güncelle
+                _authState.value = AuthState.Loading
+                
+                // Firebase'den çıkış yap
+                auth.signOut()
+                
+                // Kullanıcı verilerini temizle
+                _userName.value = "Misafir"
+                _profileImage.value = ""
+                
+                // SharedPreferences'ı temizle
+                val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                sharedPreferences.edit().clear().apply()
+                
+                // Kayıt verilerini temizle
+                clearRegistrationDataFromPrefs(context)
+                
+                // Kısa bir gecikme ekle
+                delay(100)
+                
+                // En son AuthState'i güncelle
+                _authState.value = AuthState.Idle
+                
+            } catch (e: Exception) {
+                Log.e("RegisterViewModel", "Çıkış yapılırken hata oluştu", e)
+                _authState.value = AuthState.Error("Çıkış yapılamadı: ${e.message}")
+            }
         }
     }
 

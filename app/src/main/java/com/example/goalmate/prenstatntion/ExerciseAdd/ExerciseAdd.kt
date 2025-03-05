@@ -55,6 +55,8 @@ fun AddHabitScreen(
     var showIconPicker by remember { mutableStateOf(false) }
     val habitsCount  = habitViewModel.countActiveHabits.collectAsState().value
     Log.e("habitsCount","habitsCount . $habitsCount")
+    val textColor = colorResource(R.color.yazirengi)
+
 
     val startDate by habitViewModel.currentTime.collectAsState()
     Log.e("startDateget","startDate : $startDate")
@@ -143,6 +145,7 @@ fun AddHabitScreen(
                         text = "Tıkla ikon Seç",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight(600),
+                        color = textColor,
                         modifier = Modifier
                             .padding(top = 8.dp)
                             .align(Alignment.CenterHorizontally)
@@ -170,6 +173,7 @@ fun AddHabitScreen(
                     text = "Renk Seç",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
+                    color = textColor,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
                 Row(
@@ -225,8 +229,7 @@ fun AddHabitScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Frekans Seçimi
-                FrequencySelection(frequency = frequency) { frequency = it }
+                FrequencySelection(frequency = frequency , onFrequencyChange = {frequency = it} , textColor)
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -246,7 +249,8 @@ fun AddHabitScreen(
                     hours = hours,
                     minutes = minutes,
                     onHoursChange = { hours = it },
-                    onMinutesChange = { minutes = it }
+                    onMinutesChange = { minutes = it },
+                    textColor
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -299,11 +303,12 @@ fun AddHabitScreen(
 
 
 @Composable
-fun FrequencySelection(frequency: String, onFrequencyChange: (String) -> Unit) {
+fun FrequencySelection(frequency: String, onFrequencyChange: (String) -> Unit , textColor: Color) {
     Column {
         Text(
             text = "Alışkanlık Sıklığı",
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            color = textColor
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -325,12 +330,14 @@ fun ExerciseDurationInput(
     hours: String,
     minutes: String,
     onHoursChange: (String) -> Unit,
-    onMinutesChange: (String) -> Unit
+    onMinutesChange: (String) -> Unit,
+    textColor: Color
 ) {
     Column {
         Text(
             text = "Alışkanlık Süresi (Saat:Dakika)",
-            style = MaterialTheme.typography.titleMedium
+            style = MaterialTheme.typography.titleMedium,
+            color = textColor
         )
         Row(
             modifier = Modifier.fillMaxWidth(),

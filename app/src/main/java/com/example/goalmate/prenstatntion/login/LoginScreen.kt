@@ -194,6 +194,7 @@ fun LoginContent(viewModel: RegisterViewModel, navController: NavController) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val authState by viewModel.authState.collectAsState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -266,7 +267,8 @@ fun LoginContent(viewModel: RegisterViewModel, navController: NavController) {
                 if (email.isBlank() || password.isBlank()) {
                     viewModel.showError("Lütfen email ve şifre alanlarını doldurunuz")
                 } else {
-                    viewModel.login(email, password)
+                    viewModel.
+                    login(email, password, context = context)
                 }
             },
             modifier = Modifier

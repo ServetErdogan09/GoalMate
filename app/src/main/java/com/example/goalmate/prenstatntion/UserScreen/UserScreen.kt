@@ -16,6 +16,7 @@ import com.example.goalmate.data.AuthState
 import com.example.goalmate.viewmodel.RegisterViewModel
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun UserScreen(
@@ -26,7 +27,7 @@ fun UserScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showSignOutConfirmDialog by remember { mutableStateOf(false) }
 
-
+    val auth = FirebaseAuth.getInstance()
 
     // AuthState'i gözlemle
     val authState by registerViewModel.authState.collectAsState()
@@ -34,8 +35,11 @@ fun UserScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Idle -> {
-                navController.navigate("WelcomeScreen") {
-                    popUpTo("UserScreen") { inclusive = true }
+                // Sadece çıkış yapıldığında WelcomeScreen'e yönlendir
+                if (auth.currentUser == null) {
+                    navController.navigate("WelcomeScreen") {
+                        popUpTo("UserScreen") { inclusive = true }
+                    }
                 }
             }
             else -> {}
@@ -191,7 +195,7 @@ fun UserScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        registerViewModel.signOut()
+                        registerViewModel.signOut(context = context)
                         showSignOutConfirmDialog = false
                     }
                 ) {

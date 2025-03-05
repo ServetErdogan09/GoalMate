@@ -78,3 +78,25 @@ data class RegistrationData(
     val birthMonth: String = "",
     val birthYear: String = ""
 )
+
+
+data class GroupHabit(
+    val name : String ,
+    val startDate: Long,  // Başlangıç tarihi (milisaniye)
+    val finishDate: Long,  // Bitiş tarihi (milisaniye)
+    val completedDays: Int = 0,  // Tamamlanan gün sayısı
+)
+
+data class Group(
+    val groupId: String = "",
+    val groupName: String = "",
+    val category: String = "",
+    val frequency: String = "",
+    val isPrivate: Boolean = false,
+    val participationType: String = "",
+    val participantNumber: Int = 0,
+    val description: String = "",
+    val createdAt: Long = 0,
+    val createdBy: String = "",
+    val members: List<String> = emptyList()
+)

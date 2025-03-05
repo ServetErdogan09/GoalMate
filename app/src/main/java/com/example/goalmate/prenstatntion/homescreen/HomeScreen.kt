@@ -195,7 +195,7 @@ fun HomeScreen(
         registerViewModel.getCurrentUser(context)
     }
 
-    // Profil resmi değiştiğinde log atalım
+
     LaunchedEffect(profileImage) {
         Log.d("HomeScreen", "Profil resmi güncellendi: $profileImage")
     }
@@ -266,7 +266,6 @@ fun HomeScreen(
                                                 )
                                             }
                                             else -> {
-                                                // Resource ID kontrolünü Composable dışında yapıyoruz
                                                 painterResource(getProfilePainter(profileImage, R.drawable.personel))
                                             }
                                         }
@@ -276,6 +275,9 @@ fun HomeScreen(
                                 contentDescription = "Profile Image",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
+                                    .clickable {
+                                        navController.navigate("UserScreen")
+                                    }
                                     .size(70.dp)
                                     .clip(CircleShape)
                                     .border(2.dp, colorResource(R.color.yazirengi), CircleShape)
@@ -947,7 +949,7 @@ fun CustomAlertDialog(
                         habitType = habit.habitType
                     )
                     viewModel.deleteHabit(habit)
-                    viewModel.insertHabitHistory(habitHistory)
+                    viewModel.  insertHabitHistory(habitHistory)
                     onConfirm()
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.pastelkirmizi))
@@ -1241,7 +1243,7 @@ fun calculateProgress(completedDays: Int, finishMillis : Long, startMillis : Lon
 }
 
 
-private fun getProfilePainter(profileImage: String, defaultResId: Int): Int {
+ fun getProfilePainter(profileImage: String, defaultResId: Int): Int {
     return try {
         profileImage.toInt()
     } catch (e: NumberFormatException) {

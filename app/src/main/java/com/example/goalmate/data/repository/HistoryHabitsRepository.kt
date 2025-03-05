@@ -24,7 +24,7 @@ class HistoryHabitsRepository @Inject constructor(private val habitHistoryDao: H
     }
 
 
-   suspend fun getTop10NormalHabits() : Flow<List<HabitHistory>> {
+    fun getTop10NormalHabits() : Flow<List<HabitHistory>> {
 
         return habitHistoryDao.getTop10NormalHabits()
     }
@@ -35,13 +35,12 @@ class HistoryHabitsRepository @Inject constructor(private val habitHistoryDao: H
         return habitHistoryDao.getTop10GroupHabits()
     }
 
+
     //alışkanlık ekleme
     suspend fun addGroupsNormal(habitHistory: HabitHistory): Long {
         return habitHistoryDao.historyInsert(habitHistory)
     }
 
-     fun verilericek() : Flow<List<HabitHistory>> {
-        return habitHistoryDao.getAllHabitHistory()
-    }
+
 
 }

@@ -1,6 +1,7 @@
 package com.example.goalmate.prenstatntion.MainActivity
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -53,11 +55,14 @@ import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
 import com.example.goalmate.prenstatntion.ProfilScreen.ProfileScreen
 import com.example.goalmate.prenstatntion.UserScreen.UserScreen
+import com.example.goalmate.prenstatntion.groupsadd.GroupsAdd
 import com.example.goalmate.prenstatntion.login.LoginScreen
 import com.example.goalmate.viewmodel.RegisterViewModel
 import com.example.goalmate.prenstatntion.verification.VerificationScreen
 import com.example.goalmate.prenstatntion.welcome.WelcomeScreen
+import com.example.goalmate.presentation.GroupsListScreen.GroupListScreen
 import com.example.goalmate.utils.CloudinaryConfig
+import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 @AndroidEntryPoint
@@ -84,6 +89,7 @@ fun ChangingScreen() {
     val registerViewModel: RegisterViewModel = hiltViewModel()
     val starCoinViewModel: StarCoinViewModel = viewModel()
     val completeDayViewModel: CompleteDayViewModel = viewModel()
+    val groupsAddViewModel : GroupsAddViewModel = viewModel()
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
 
@@ -97,7 +103,20 @@ fun ChangingScreen() {
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Idle -> {
-                navController.navigate("WelcomeScreen")
+                // Sadece WelcomeScreen'den veya LoginScreen'den geliyorsa yönlendir
+                val currentRoute = navController.currentBackStackEntry?.destination?.route
+                if (currentRoute == "WelcomeScreen" || currentRoute == "LoginScreen") {
+                    if (auth.currentUser == null) {
+                        navController.navigate("WelcomeScreen") {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        }
+                    } else {
+                        // Kullanıcı giriş yapmışsa HomeScreen'e yönlendir
+                        navController.navigate("HomeScreen") {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        }
+                    }
+                }
             }
             is AuthState.Success -> {
                 navController.navigate("HomeScreen") {
@@ -123,9 +142,11 @@ fun ChangingScreen() {
                 currentRoute != "verification" &&
                 !currentRoute.startsWith("AnalysisScreen") &&
                 currentRoute != "LoginScreen" &&
+                currentRoute != "GroupsAdd" &&
                 currentRoute != "ProfileScreen" &&
                 currentRoute != "register_screen" &&
-                currentRoute != "WelcomeScreen"
+                currentRoute != "WelcomeScreen" &&
+                currentRoute != "UserScreen"
             ) {
                 BottomNavigationBar(navController)
             }
@@ -164,7 +185,15 @@ fun ChangingScreen() {
             }
 
             composable(route = "UserScreen") {
-                UserScreen(registerViewModel,navController,context)
+                if (auth.currentUser != null) {
+                    UserScreen(registerViewModel, navController, context)
+                } else {
+                    LaunchedEffect(Unit) {
+                        navController.navigate("WelcomeScreen") {
+                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                        }
+                    }
+                }
             }
 
             composable(
@@ -183,6 +212,14 @@ fun ChangingScreen() {
 
             composable(route = "GroupAndPrivate") {
                 GroupAndPrivate(navController = navController, habitViewModel)
+            }
+
+            composable(route = "GroupsAdd") {
+                GroupsAdd(navController , viewModel = groupsAddViewModel)
+            }
+
+            composable(route = "GroupListScreen") {
+                GroupListScreen(navController, viewModel = groupsAddViewModel , registerViewModel = registerViewModel)
             }
 
             composable(
@@ -207,27 +244,34 @@ fun ChangingScreen() {
 fun BottomNavigationBar(navController: NavController) {
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
-    val lineColor = colorResource(R.color.yazirengi) // Çizgi için renk
+    val lineColor = colorResource(R.color.yazirengi)
+    val auth = FirebaseAuth.getInstance()
+    val registerViewModel: RegisterViewModel = hiltViewModel()
+    val context = LocalContext.current
+
+    LaunchedEffect(auth.currentUser) {
+        if (auth.currentUser != null) {
+            registerViewModel.getCurrentUser(context)
+        }
+    }
 
     NavigationBar(
         containerColor = colorResource(R.color.arkaplan),
-
-        tonalElevation = 4.dp, // Hafif gölgelendirme
-        modifier = Modifier
-            .drawBehind { // Çizgiyi çizecek alan
-                val strokeWidth = 4.dp.toPx() // Çizginin kalınlığı
-                val y = 0f // Çizginin başlangıç y koordinatı (üst kısım)
-                drawLine(
-                    color = lineColor, // Çizgi rengi
-                    start = Offset(0f, y),
-                    end = Offset(size.width, y), // Çizginin bitiş noktası
-                    strokeWidth = strokeWidth
-                )
-            }
+        tonalElevation = 4.dp,
+        modifier = Modifier.drawBehind {
+            val strokeWidth = 4.dp.toPx()
+            val y = 0f
+            drawLine(
+                color = lineColor,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = strokeWidth
+            )
+        }
     ) {
         val items = listOf(
             BottomNavItem("HomeScreen", "Home", R.drawable.home),
-            BottomNavItem("Groups", "Groups", R.drawable.groups),
+            BottomNavItem("GroupListScreen", "Groups", R.drawable.groups),
             BottomNavItem("GroupAndPrivate", "Add", R.drawable.add),
             BottomNavItem("Calendar", "Calendar", R.drawable.calendar),
             BottomNavItem("UserScreen", "Profile", R.drawable.profil)
@@ -237,10 +281,25 @@ fun BottomNavigationBar(navController: NavController) {
             NavigationBarItem(
                 selected = currentRoute == item.route,
                 onClick = {
-                    navController.navigate(item.route) {
-                        popUpTo(navController.graph.startDestinationId) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
+                    when {
+                        item.route == "UserScreen" -> {
+                            if (auth.currentUser != null) {
+                                navController.navigate(item.route) {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            } else {
+                                navController.navigate("WelcomeScreen") {
+                                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                                }
+                            }
+                        }
+                        else -> {
+                            navController.navigate(item.route) {
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        }
                     }
                 },
                 icon = {
@@ -250,9 +309,9 @@ fun BottomNavigationBar(navController: NavController) {
                             .padding(10.dp)
                             .background(
                                 color = if (currentRoute == item.route)
-                                    colorResource(R.color.yazirengi) // Aktif durumda dış arka plan rengi
+                                    colorResource(R.color.yazirengi)
                                 else
-                                    Color.Transparent, // Pasif durumda şeffaf
+                                    Color.Transparent,
                                 shape = CircleShape
                             )
                     ) {
@@ -260,14 +319,14 @@ fun BottomNavigationBar(navController: NavController) {
                             painter = painterResource(item.icon),
                             contentDescription = item.label,
                             tint = if (currentRoute == item.route)
-                                Color.White // Aktif durum için ikon iç rengi
+                                Color.White
                             else
-                                colorResource(R.color.kutubordrengi) // Pasif durum rengi
+                                colorResource(R.color.kutubordrengi)
                         )
                     }
                 },
                 colors = NavigationBarItemDefaults.colors(
-                    indicatorColor = Color.Transparent // İkonun altındaki vurgu kaldırıldı
+                    indicatorColor = Color.Transparent
                 )
             )
         }
