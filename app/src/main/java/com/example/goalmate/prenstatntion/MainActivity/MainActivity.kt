@@ -53,6 +53,7 @@ import com.example.goalmate.R
 import com.example.goalmate.ui.theme.YeniProjeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
+import com.example.goalmate.prenstatntion.GroupsListScreen.GroupDetailScreen
 import com.example.goalmate.prenstatntion.ProfilScreen.ProfileScreen
 import com.example.goalmate.prenstatntion.UserScreen.UserScreen
 import com.example.goalmate.prenstatntion.groupsadd.GroupsAdd
@@ -141,6 +142,7 @@ fun ChangingScreen() {
                 currentRoute != "login" &&
                 currentRoute != "verification" &&
                 !currentRoute.startsWith("AnalysisScreen") &&
+                !currentRoute.startsWith("GroupDetailScreen") &&
                 currentRoute != "LoginScreen" &&
                 currentRoute != "GroupsAdd" &&
                 currentRoute != "ProfileScreen" &&
@@ -161,7 +163,7 @@ fun ChangingScreen() {
                 LoginScreen(navController = navController, context = context)
             }
 
-
+            
             composable(route = "ProfileScreen") {
                 ProfileScreen(navController = navController)
             }
@@ -201,7 +203,7 @@ fun ChangingScreen() {
                 arguments = listOf(
                     navArgument("isGroup") {
                         type = NavType.BoolType
-                        defaultValue = false // Eğer parametre gelmezse varsayılan değer
+                        defaultValue = false 
                     }
                 )
             ) { backStackEntry ->
@@ -237,6 +239,19 @@ fun ChangingScreen() {
                 AnalysisScreen(navController = navController,
                     habitViewModel = habitViewModel, habitId = habitId , completedDayViewModel = completeDayViewModel, starCoinViewModel = starCoinViewModel )
             }
+
+            composable(
+                route = "GroupDetailScreen/{groupId}",
+                arguments = listOf(
+                    navArgument("groupId"){
+                        type = NavType.StringType
+                    }
+                )
+            ) {backStackEntry->
+                val groupId = backStackEntry.arguments?.getString("groupId")?:""
+                GroupDetailScreen(groupId = groupId,navController , groupsAddViewModel)
+            }
+
         }
     }
 }

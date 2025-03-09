@@ -22,16 +22,8 @@ sealed class GroupListState {
     data class Error(val message: String) : GroupListState()
 }
 
-data class Group(
-    val groupId: String = "",
-    val groupName: String = "",
-    val category: String = "",
-    val frequency: String = "",
-    val isPrivate: Boolean = false,
-    val participationType: String = "",
-    val participantNumber: Int = 0,
-    val description: String = "",
-    val createdAt: Long = 0,
-    val createdBy: String = "",
-    val members: List<String> = emptyList()
-)
+sealed class GroupDetailState {
+    data object Loading : GroupDetailState()
+    data class Success(val group: Group) : GroupDetailState()
+    data class Error(val message: String) : GroupDetailState()
+}

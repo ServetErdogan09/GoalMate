@@ -225,7 +225,7 @@ fun GroupsAdd(
                         }
                     }
 
-                    Divider(thickness = 1.dp)
+                    HorizontalDivider(thickness = 1.dp)
 
                     // Gizlilik Ayarı
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -241,7 +241,10 @@ fun GroupsAdd(
                         ) {
                             ElevatedFilterChip(
                                 selected = !isPrivate,
-                                onClick = { isPrivate = false },
+                                onClick = { 
+                                    isPrivate = false
+                                    participationType = "Herkes"
+                                },
                                 label = { Text("🌎 Açık Grup") },
                                 colors = FilterChipDefaults.elevatedFilterChipColors(
                                     selectedContainerColor = colorResource(R.color.kutubordrengi),
@@ -250,7 +253,10 @@ fun GroupsAdd(
                             )
                             ElevatedFilterChip(
                                 selected = isPrivate,
-                                onClick = { isPrivate = true },
+                                onClick = { 
+                                    isPrivate = true
+                                    participationType = "Onay"
+                                },
                                 label = { Text("🔒 Özel Grup") },
                                 colors = FilterChipDefaults.elevatedFilterChipColors(
                                     selectedContainerColor = colorResource(R.color.kutubordrengi),
@@ -260,7 +266,7 @@ fun GroupsAdd(
                         }
                     }
 
-                    Divider(thickness = 1.dp)
+                    HorizontalDivider(thickness = 1.dp)
 
                     // Katılım Türü
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -274,15 +280,70 @@ fun GroupsAdd(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf(
-                                "👥 Herkes" to "Herkes",
-                                "✉️ Davetle" to "Davetle",
-                                "✅ Onay" to "Onay"
-                            ).forEach { (label, value) ->
+                            if (!isPrivate) {
+                                // Herkese açık grup için sadece "Herkes" seçeneği aktif
                                 ElevatedFilterChip(
-                                    selected = participationType == value,
-                                    onClick = { participationType = value },
-                                    label = { Text(label) },
+                                    selected = participationType == "Herkes",
+                                    onClick = { participationType = "Herkes" },
+                                    label = { Text("👥 Herkes") },
+                                    colors = FilterChipDefaults.elevatedFilterChipColors(
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        selectedLabelColor = Color.White
+                                    )
+                                )
+                                // Diğer seçenekler deaktif
+                                ElevatedFilterChip(
+                                    selected = false,
+                                    onClick = { },
+                                    label = { Text("✉️ Davetle") },
+                                    enabled = false,
+                                    colors = FilterChipDefaults.elevatedFilterChipColors(
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        selectedLabelColor = Color.White,
+                                        disabledContainerColor = Color.Gray.copy(alpha = 0.3f),
+                                        disabledLabelColor = Color.Gray
+                                    )
+                                )
+                                ElevatedFilterChip(
+                                    selected = false,
+                                    onClick = { },
+                                    label = { Text("✅ Onay") },
+                                    enabled = false,
+                                    colors = FilterChipDefaults.elevatedFilterChipColors(
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        selectedLabelColor = Color.White,
+                                        disabledContainerColor = Color.Gray.copy(alpha = 0.3f),
+                                        disabledLabelColor = Color.Gray
+                                    )
+                                )
+                            } else {
+                                // Özel grup için "Herkes" seçeneği deaktif
+                                ElevatedFilterChip(
+                                    selected = false,
+                                    onClick = { },
+                                    label = { Text("👥 Herkes") },
+                                    enabled = false,
+                                    colors = FilterChipDefaults.elevatedFilterChipColors(
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        selectedLabelColor = Color.White,
+                                        disabledContainerColor = Color.Gray.copy(alpha = 0.3f),
+                                        disabledLabelColor = Color.Gray
+                                    )
+                                )
+                                // Diğer seçenekler aktif
+                                ElevatedFilterChip(
+                                    selected = participationType == "Davetle",
+                                    onClick = { participationType = "Davetle" },
+                                    label = { Text("✉️ Davetle") },
+                                    colors = FilterChipDefaults.elevatedFilterChipColors(
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        selectedLabelColor = Color.White
+                                    )
+                                )
+                                ElevatedFilterChip(
+                                    selected = participationType == "Onay",
+                                    onClick = { participationType = "Onay" },
+                                    label = { Text("✅ Onay") },
                                     colors = FilterChipDefaults.elevatedFilterChipColors(
                                         selectedContainerColor = colorResource(R.color.kutubordrengi),
                                         selectedLabelColor = Color.White
@@ -399,6 +460,15 @@ fun GroupsAdd(
                             scope.launch {
                                 snackbarHostState.showSnackbar(
                                     message = "Grup en az 2 kişi olmalıdır",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
+
+                        groupDescription.isBlank() -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Lütfen grup açıklamasını boş bırakmayın. Açıklama, grup hakkında bilgi vermek için önemlidir.",
                                     duration = SnackbarDuration.Short
                                 )
                             }

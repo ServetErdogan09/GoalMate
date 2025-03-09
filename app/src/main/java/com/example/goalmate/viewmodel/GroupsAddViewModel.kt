@@ -6,14 +6,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.extrensions.GroupCreationState
+import com.example.goalmate.extrensions.GroupDetailState
 import com.example.goalmate.extrensions.GroupListState
 import com.example.goalmate.utils.NetworkUtils.isNetworkAvailable
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,8 +28,14 @@ class GroupsAddViewModel @Inject constructor(
     private val _groupCreationState = MutableStateFlow<GroupCreationState>(GroupCreationState.Loading)
     val groupCreationState = _groupCreationState.asStateFlow()
 
+    private val _profileImages = MutableStateFlow<Map<String, String>>(emptyMap())
+    val profileImages: StateFlow<Map<String, String>> = _profileImages.asStateFlow()
+
     private val _groupListState = MutableStateFlow<GroupListState>(GroupListState.Loading)
     val groupListState = _groupListState.asStateFlow()
+
+    private val _groupDetailState = MutableStateFlow<GroupDetailState>(GroupDetailState.Loading)
+    val groupDetailState = _groupDetailState.asStateFlow()
 
     init {
         getGroupList()
@@ -94,6 +103,54 @@ class GroupsAddViewModel @Inject constructor(
         }
     }
 
+    fun getGroupById(groupId: String) {
+        _groupDetailState.value = GroupDetailState.Loading
+        viewModelScope.launch {
+            try {
+                val groupDocument = db.collection("groups").document(groupId).get().await()
+                if (groupDocument.exists()) {
+                    val group = Group(
+                        groupId = groupDocument.getString("groupId") ?: "",
+                        groupName = groupDocument.getString("groupName") ?: "",
+                        category = groupDocument.getString("category") ?: "",
+                        frequency = groupDocument.getString("frequency") ?: "",
+                        isPrivate = groupDocument.getBoolean("isPrivate") ?: false,
+                        participationType = groupDocument.getString("participationType") ?: "",
+                        participantNumber = groupDocument.getLong("participantNumber")?.toInt() ?: 0,
+                        description = groupDocument.getString("description") ?: "",
+                        createdAt = groupDocument.getLong("createdAt") ?: 0,
+                        createdBy = groupDocument.getString("createdBy") ?: "",
+                        members = (groupDocument.get("members") as? List<String>) ?: emptyList()
+                    )
+                    _groupDetailState.value = GroupDetailState.Success(group)
+                } else {
+                    _groupDetailState.value = GroupDetailState.Error("Grup bulunamadı")
+                }
+            } catch (e: Exception) {
+                _groupDetailState.value = GroupDetailState.Error("Grup detayları yüklenirken hata oluştu: ${e.message}")
+                Log.e("getGroupById", "getGroupById : veriler çekilirken hata oluştu")
+            }
+        }
+    }
+
+    fun getProfile(userId: String) {
+        viewModelScope.launch {
+            try {
+                val document = db.collection("users")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                if (document != null && document.exists()) {
+                    val photoUrl = document.getString("profileImage") ?: ""
+                    _profileImages.value += (userId to photoUrl)
+                }
+            } catch (e: Exception) {
+                Log.w("UserPhoto", "Kullanıcı verisi çekilemedi", e)
+            }
+        }
+    }
+
     fun getGroupList() {
         viewModelScope.launch {
             _groupListState.value = GroupListState.Loading
@@ -136,9 +193,5 @@ class GroupsAddViewModel @Inject constructor(
                 Log.e("GroupsAdd", "Error fetching groups", e)
             }
         }
-    }
-
-    fun retryGetGroupList() {
-        getGroupList()
     }
 }

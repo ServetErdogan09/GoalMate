@@ -31,6 +31,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -347,18 +348,20 @@ fun ProgressCircleComponent(
     ) {
         // Arka Plan Dairesi
         CircularProgressIndicator(
-            progress = 1f,
+            progress = { 1f },
             modifier = Modifier.size(160.dp),
             color = Color.LightGray,
-            strokeWidth = 12.dp
+            strokeWidth = 12.dp,
+            trackColor = ProgressIndicatorDefaults.circularTrackColor,
         )
 
         // Animasyonlu İlerleme Dairesi
         CircularProgressIndicator(
-            progress = animatedProgress.value,
+            progress = { animatedProgress.value },
             modifier = Modifier.size(180.dp),
             color = colorResource(R.color.yeşil),
-            strokeWidth = 12.dp
+            strokeWidth = 12.dp,
+            trackColor = ProgressIndicatorDefaults.circularTrackColor,
         )
 
         // Yüzde veya Emoji Gösterimi

@@ -445,7 +445,6 @@ class RegisterViewModel @Inject constructor(
 
 
 
-    // updateProfileImage fonksiyonunu güncelleyelim
     fun updateProfileImage(imageUri: String, context: Context) {
         viewModelScope.launch {
             try {
