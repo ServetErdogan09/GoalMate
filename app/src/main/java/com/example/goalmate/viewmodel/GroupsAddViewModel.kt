@@ -34,6 +34,9 @@ class GroupsAddViewModel @Inject constructor(
     private val _groupListState = MutableStateFlow<GroupListState>(GroupListState.Loading)
     val groupListState = _groupListState.asStateFlow()
 
+    private val _getUserName = MutableStateFlow<String>("")
+    val getUserName = _getUserName.asStateFlow()
+
     private val _groupDetailState = MutableStateFlow<GroupDetailState>(GroupDetailState.Loading)
     val groupDetailState = _groupDetailState.asStateFlow()
 
@@ -48,6 +51,7 @@ class GroupsAddViewModel @Inject constructor(
         isPrivate: Boolean,
         participationType: String,
         participantNumber: Int,
+        habitDuration : String,
         description: String,
         context: Context
     ) {
@@ -78,6 +82,7 @@ class GroupsAddViewModel @Inject constructor(
                     "description" to description,
                     "createdAt" to System.currentTimeMillis(),
                     "createdBy" to currentUserId,
+                    "habitDuration" to habitDuration,
                     "members" to listOf(currentUserId)
                 )
 
@@ -120,6 +125,7 @@ class GroupsAddViewModel @Inject constructor(
                         description = groupDocument.getString("description") ?: "",
                         createdAt = groupDocument.getLong("createdAt") ?: 0,
                         createdBy = groupDocument.getString("createdBy") ?: "",
+                        habitDuration = groupDocument.getString("habitDuration")?:"",
                         members = (groupDocument.get("members") as? List<String>) ?: emptyList()
                     )
                     _groupDetailState.value = GroupDetailState.Success(group)
@@ -129,6 +135,26 @@ class GroupsAddViewModel @Inject constructor(
             } catch (e: Exception) {
                 _groupDetailState.value = GroupDetailState.Error("Grup detayları yüklenirken hata oluştu: ${e.message}")
                 Log.e("getGroupById", "getGroupById : veriler çekilirken hata oluştu")
+            }
+        }
+    }
+
+    fun getUsersName (userId: String){
+        viewModelScope.launch {
+            try {
+              val document =   db.collection("users")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                if (document != null && document.exists()){
+                    val userName = document.getString("name")?:"Misafir"
+                    _getUserName.value = userName
+
+                }
+
+            }catch (e:Exception){
+                Log.e("users","kullanıcı ismini çekerken hata oluştu")
             }
         }
     }
@@ -177,6 +203,7 @@ class GroupsAddViewModel @Inject constructor(
                                         description = document.getString("description") ?: "",
                                         createdAt = document.getLong("createdAt") ?: 0,
                                         createdBy = document.getString("createdBy") ?: "",
+                                        habitDuration = document.getString("habitDuration")?:"",
                                         members = (document.get("members") as? List<String>) ?: emptyList()
                                     )
 

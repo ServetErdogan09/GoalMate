@@ -42,6 +42,8 @@ fun GroupsAdd(
     var participantNumber by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Spor") }
     var groupDescription by remember { mutableStateOf("") }
+    var habitHours by remember { mutableStateOf("") }
+    var habitMinutes by remember { mutableStateOf("") }
     
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -222,6 +224,71 @@ fun GroupsAdd(
                                     )
                                 )
                             }
+                        }
+                    }
+
+                    // Alışkanlık Süresi
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Alışkanlık Süresi",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = colorResource(R.color.yazirengi)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = habitHours,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty()) {
+                                        habitHours = ""
+                                    } else {
+                                        val number = newValue.toIntOrNull()
+                                        if (number != null && number <= 23) {
+                                            habitHours = number.toString()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                label = { Text("Saat") },
+                                placeholder = { Text("0-23") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = colorResource(R.color.kutubordrengi),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
+                            )
+                            
+                            Text(":", color = textColor)
+                            
+                            OutlinedTextField(
+                                value = habitMinutes,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty()) {
+                                        habitMinutes = ""
+                                    } else {
+                                        val number = newValue.toIntOrNull()
+                                        if (number != null && number <= 59) {
+                                            habitMinutes = number.toString()
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                label = { Text("Dakika") },
+                                placeholder = { Text("0-59") },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = colorResource(R.color.kutubordrengi),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                )
+                            )
                         }
                     }
 
@@ -473,7 +540,25 @@ fun GroupsAdd(
                                 )
                             }
                         }
+                        habitHours.isBlank() && habitMinutes.isBlank() -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Lütfen alışkanlık süresini belirtin",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
                         else -> {
+                            val totalMinutes = (habitHours.toIntOrNull() ?: 0) * 60 + (habitMinutes.toIntOrNull() ?: 0)
+                            if (totalMinutes == 0) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Alışkanlık süresi 0 olamaz",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                                return@Button
+                            }
                             viewModel.createGroup(
                                 groupName = groupName,
                                 category = selectedCategory,
@@ -482,6 +567,7 @@ fun GroupsAdd(
                                 participationType = participationType,
                                 participantNumber = participantNumber.toInt(),
                                 description = groupDescription,
+                                habitDuration = totalMinutes.toString(),
                                 context = context
                             )
                         }

@@ -97,6 +97,8 @@ data class Group(
     val participantNumber: Int = 0,
     val description: String = "",
     val createdAt: Long = 0,
+    val habitDuration: String,
     val createdBy: String = "",
-    val members: List<String> = emptyList()
-)
+    val members: List<String> = emptyList(),
+
+    )

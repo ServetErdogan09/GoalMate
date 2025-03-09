@@ -71,7 +71,7 @@ fun GroupListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(color = colorResource(R.color.arkaplan))
-            .padding(top = 16.dp, bottom = 110.dp)
+            .padding(top = 25.dp, bottom = 110.dp)
     ) {
 
         Spacer(modifier = Modifier.height(15.dp))
