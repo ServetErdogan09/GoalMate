@@ -227,7 +227,7 @@ fun GroupsAdd(
                         }
                     }
 
-                    // Alışkanlık Süresi
+
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "Alışkanlık Süresi",
@@ -246,9 +246,17 @@ fun GroupsAdd(
                                     if (newValue.isEmpty()) {
                                         habitHours = ""
                                     } else {
-                                        val number = newValue.toIntOrNull()
-                                        if (number != null && number <= 23) {
-                                            habitHours = number.toString()
+
+                                        if (newValue.length == 1 && newValue[0].isDigit() && newValue[0].toString().toInt() <= 2) {
+                                            habitHours = newValue
+                                        }
+
+                                        else if (newValue.length == 2) {
+                                            val firstDigit = habitHours.first().toString().toInt()
+                                            val secondDigit = newValue.last().toString().toInt()
+                                            if ((firstDigit == 2 && secondDigit <= 3) || (firstDigit < 2)) {
+                                                habitHours = newValue
+                                            }
                                         }
                                     }
                                 },
@@ -256,7 +264,7 @@ fun GroupsAdd(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                                 label = { Text("Saat") },
-                                placeholder = { Text("0-23") },
+                                placeholder = { Text("00-23") },
                                 shape = RoundedCornerShape(8.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = colorResource(R.color.kutubordrengi),
@@ -272,9 +280,13 @@ fun GroupsAdd(
                                     if (newValue.isEmpty()) {
                                         habitMinutes = ""
                                     } else {
-                                        val number = newValue.toIntOrNull()
-                                        if (number != null && number <= 59) {
-                                            habitMinutes = number.toString()
+                                        // İlk karakterin 0-5 olmasını kontrol et
+                                        if (newValue.length == 1 && newValue[0].isDigit() && newValue[0].toString().toInt() <= 5) {
+                                            habitMinutes = newValue
+                                        } 
+                                        // İkinci karakterin 0-9 olmasını kontrol et
+                                        else if (newValue.length == 2 && newValue.last().isDigit()) {
+                                            habitMinutes = newValue
                                         }
                                     }
                                 },
@@ -282,7 +294,7 @@ fun GroupsAdd(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                                 label = { Text("Dakika") },
-                                placeholder = { Text("0-59") },
+                                placeholder = { Text("00-59") },
                                 shape = RoundedCornerShape(8.dp),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = colorResource(R.color.kutubordrengi),

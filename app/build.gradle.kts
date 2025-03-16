@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.dagger.hilt.android") // Hilt eklentisi
+    id("com.google.dagger.hilt.android")
     id("kotlin-kapt")
     alias(libs.plugins.google.gms.google.services)
 }
@@ -40,6 +40,10 @@ android {
     buildFeatures {
         compose = true
     }
+    lint {
+        checkDependencies = true
+        checkReleaseBuilds = false
+    }
 }
 
 dependencies {
@@ -59,6 +63,10 @@ dependencies {
     implementation(libs.firebase.storage.ktx)
     implementation(libs.firebase.storage)
     implementation(libs.play.services.cast.tv)
+    implementation(libs.firebase.messaging) // FCM
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.volley)
+    implementation(libs.androidx.tools.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -69,6 +77,9 @@ dependencies {
 
     implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation ("com.airbnb.android:lottie-compose:6.2.0")
+
+
+    implementation("com.android.volley:volley:1.2.1")
 
 
     implementation ("com.cloudinary:cloudinary-android:2.3.1") // resimlerimizin depolama alanı olarak kullanacağız
@@ -86,5 +97,10 @@ dependencies {
     implementation("com.google.dagger:hilt-android:2.51.1")
     kapt("com.google.dagger:hilt-android-compiler:2.51.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+
+
+    // API 33 ve üzeri
+    implementation( libs.accompanist.permissions)
+
 
 }

@@ -1,10 +1,14 @@
 package com.example.goalmate.data
 
+import com.example.goalmate.data.localdata.GroupRequest
+
 sealed class AuthState {
-    object Idle : AuthState()
-    object Loading : AuthState()
-    object Success : AuthState()
-    object VerificationRequired : AuthState()
-    object ProfileRequired : AuthState()
+    data object Idle : AuthState()
+    data object Loading : AuthState()
+    data object Success : AuthState()
+    data object VerificationRequired : AuthState()
+    data object ProfileRequired : AuthState()
     data class Error(val message: String) : AuthState()
-} 
+}
+
+

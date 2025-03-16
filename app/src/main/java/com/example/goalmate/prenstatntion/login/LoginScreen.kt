@@ -53,8 +53,7 @@ fun LoginScreen(
         mutableStateOf(initialLoginMode)
     }
     val currentStep by viewModel.currentStep.collectAsState(initial = RegistrationStep.EMAIL_PASSWORD)
-    val profileImage by viewModel.profileImage.collectAsState()
-    
+
 
 
 

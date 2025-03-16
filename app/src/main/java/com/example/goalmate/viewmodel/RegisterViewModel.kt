@@ -32,6 +32,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.delay
 
 @HiltViewModel
@@ -390,30 +391,45 @@ class RegisterViewModel @Inject constructor(
                 val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
                 val profileImage = sharedPreferences.getString("profileImage", "") ?: ""
 
-                // Kullanıcı verilerini hazırla
-                val userData = hashMapOf(
-                    "email" to savedData.email,
-                    "name" to savedData.name,
-                    "surname" to savedData.surname,
-                    "gender" to savedData.gender,
-                    "birthDate" to "${savedData.birthDay}/${savedData.birthMonth}/${savedData.birthYear}",
-                    "profileImage" to profileImage,
-                    "isEmailVerified" to true,
-                    "createdAt" to System.currentTimeMillis(),
-                    "updatedAt" to System.currentTimeMillis()
-                )
+                 FirebaseMessaging.getInstance().token.addOnCompleteListener {task ->
+                    if (task.isSuccessful){
+                        val  fcmToken = task.result
 
-                Log.d("RegisterViewModel", "Prepared user data: $userData")
+                        // Kullanıcı verilerini hazırla
+                        val userData = hashMapOf(
+                            "email" to savedData.email,
+                            "name" to savedData.name,
+                            "surname" to savedData.surname,
+                            "gender" to savedData.gender,
+                            "birthDate" to "${savedData.birthDay}/${savedData.birthMonth}/${savedData.birthYear}",
+                            "profileImage" to profileImage,
+                            "isEmailVerified" to true,
+                            "createdAt" to System.currentTimeMillis(),
+                            "updatedAt" to System.currentTimeMillis(),
+                            "joinedGroups" to listOf<String>(),
+                            "fcmToken" to fcmToken
+                        )
 
-                // Firestore'a kaydet
-                db.collection("users")
-                    .document(userId)
-                    .set(userData)
-                    .await()
+                        Log.d("RegisterViewModel", "Prepared user data: $userData")
+
+
+                        db.collection("users")
+                            .document(userId)
+                            .set(userData)
+                            .addOnSuccessListener {
+                                Log.d("RegisterViewModel", "User data saved successfully")
+                            }
+                            .addOnFailureListener {e->
+                                Log.e("RegisterViewModel", "Error saving user data: ${e.message}")
+
+                            }
+                    }
+                }
+
 
                 Log.d("RegisterViewModel", "Successfully saved user data to Firestore")
 
-                // Firebase Auth'da displayName'i güncelle
+
                 auth.currentUser?.updateProfile(userProfileChangeRequest {
                     displayName = savedData.name
                 })?.await()
@@ -457,7 +473,7 @@ class RegisterViewModel @Inject constructor(
                         imageUri // Resource ID'yi doğrudan kullan
                     }
                     
-                    // Galeriden resim seçilmişse
+
                     imageUri.startsWith("content") -> {
                         Log.d("RegisterViewModel", "Galeri resmi Cloudinary'ye yükleniyor")
                         uploadImageToCloudinary(context, Uri.parse(imageUri))?.also {
@@ -468,7 +484,7 @@ class RegisterViewModel @Inject constructor(
                         }
                     }
                     
-                    // Zaten bir URL ise
+
                     else -> imageUri
                 }
                 

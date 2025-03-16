@@ -6,4 +6,8 @@ object Constants {
     const val dailyPoints: Int = 10  // Günlük puan
     const val weeklyBonusPoints: Int = 40  // Haftalık bonus puan
     const val monthlyBonusPoints: Int = 100  // Aylık bonus puan
+
+
+
+
     }

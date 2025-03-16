@@ -4,6 +4,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
+import com.example.goalmate.extrensions.RequestStatus
+import com.google.firebase.database.IgnoreExtraProperties
 
 @Entity(tableName = "habits")
 data class Habit(
@@ -87,6 +89,7 @@ data class GroupHabit(
     val completedDays: Int = 0,  // Tamamlanan gün sayısı
 )
 
+@IgnoreExtraProperties
 data class Group(
     val groupId: String = "",
     val groupName: String = "",
@@ -101,4 +104,19 @@ data class Group(
     val createdBy: String = "",
     val members: List<String> = emptyList(),
 
-    )
+    ){
+    constructor() : this("", "", "", "", false, "", 0, "", 0, "", "", emptyList())
+}
+
+
+data class GroupRequest(
+    val id: String,
+    val groupId: String,
+    val userId: String,
+    val senderName: String,
+    val senderImage: String?,
+    val groupName: String,
+    val timestamp: Long,
+    val status: RequestStatus = RequestStatus.PENDING,
+    val isRead: Boolean = false
+)

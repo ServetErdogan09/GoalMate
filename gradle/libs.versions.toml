@@ -1,5 +1,7 @@
 [versions]
+accompanistPermissions = "0.37.2"
 agp = "8.8.1"
+firebaseBom = "33.10.0"
 hiltAndroidGradlePlugin = "2.51.1"
 kotlin = "2.0.0"
 coreKtx = "1.15.0"
@@ -17,10 +19,15 @@ playServicesAuth = "21.3.0"
 firebaseStorageKtx = "21.0.1"
 firebaseStorage = "21.0.1"
 playServicesCastTv = "21.1.1"
+firebaseMessaging = "24.1.0"
+volley = "1.2.1"
+toolsCore = "1.0.0-alpha12"
 
 [libraries]
+accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 firebase-analytics-ktx = { module = "com.google.firebase:firebase-analytics-ktx" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 hilt-android-gradle-plugin = { module = "com.google.dagger:hilt-android-gradle-plugin", version.ref = "hiltAndroidGradlePlugin" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
@@ -42,6 +49,9 @@ play-services-auth = { module = "com.google.android.gms:play-services-auth", ver
 firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 firebase-storage = { group = "com.google.firebase", name = "firebase-storage", version.ref = "firebaseStorage" }
 play-services-cast-tv = { group = "com.google.android.gms", name = "play-services-cast-tv", version.ref = "playServicesCastTv" }
+firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging", version.ref = "firebaseMessaging" }
+volley = { group = "com.android.volley", name = "volley", version.ref = "volley" }
+androidx-tools-core = { group = "androidx.privacysandbox.tools", name = "tools-core", version.ref = "toolsCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

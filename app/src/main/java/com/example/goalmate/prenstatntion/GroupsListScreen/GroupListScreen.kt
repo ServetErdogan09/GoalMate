@@ -4,11 +4,11 @@ import android.util.Log
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +43,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ButtonDefaults
+import androidx.compose.material.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,14 +60,22 @@ import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.example.goalmate.viewmodel.RegisterViewModel
 
+
 @Composable
 fun GroupListScreen(
     navController: NavController,
     viewModel: GroupsAddViewModel = viewModel(),
     registerViewModel: RegisterViewModel = viewModel()
 ) {
+    var selectedTab by remember { mutableStateOf(0) }
     val groupListState = viewModel.groupListState.collectAsState().value
+    val myGroups by viewModel.myGroups.collectAsState()
+    Log.e("myGroups","myGroups . $myGroups")
 
+    LaunchedEffect(Unit) {
+        // kullanıcının olduğu gurupları çek
+        viewModel.getUserGroups()
+    }
 
     Column(
         modifier = Modifier
@@ -73,47 +83,131 @@ fun GroupListScreen(
             .background(color = colorResource(R.color.arkaplan))
             .padding(top = 25.dp, bottom = 110.dp)
     ) {
-
-        Spacer(modifier = Modifier.height(15.dp))
-        Groupcategory()
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                .background(colorResource(R.color.beyaz))
-                .padding(top = 20.dp)
+        Spacer(modifier = Modifier.padding(top = 15.dp))
+        // Tabs
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = colorResource(R.color.beyaz),
+            contentColor = colorResource(R.color.kutubordrengi)
         ) {
-            when(groupListState) {
-                is GroupListState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = colorResource(R.color.kutubordrengi),
-                            modifier = Modifier.size(48.dp)
-                        )
+            Tab(
+                selected = selectedTab == 0,
+                onClick = {
+                    selectedTab = 0
+
+                          },
+                text = { Text("Tüm Gruplar") }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Katıldığım Gruplar") }
+            )
+        }
+
+        when (selectedTab) {
+            0 -> {
+                // Tüm Gruplar Tab'ı
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                        .background(colorResource(R.color.beyaz))
+                ) {
+                    Spacer(modifier = Modifier.height(15.dp))
+                    Groupcategory(viewModel)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    when(groupListState) {
+                        is GroupListState.Loading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = colorResource(R.color.kutubordrengi),
+                                    modifier = Modifier.size(48.dp)
+                                )
+                            }
+                        }
+                        is GroupListState.Error -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = groupListState.message,
+                                    color = colorResource(R.color.pastelkirmizi),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                        }
+                        is GroupListState.Success -> {
+                            if (groupListState.groups.isEmpty()) {
+                                EmptyGroupState(selectedTab)
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    items(groupListState.groups) { group ->
+                                        GroupCard(group = group, groupsAddViewModel = viewModel, navController)
+                                    }
+
+                                    item {
+                                        if (groupListState.groups.isNotEmpty()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(8.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(32.dp),
+                                                    color = colorResource(R.color.kutubordrengi)
+                                                )
+                                            }
+
+                                            LaunchedEffect(Unit) {
+                                                viewModel.loadMoreGroups()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                is GroupListState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = groupListState.message,
-                            color = colorResource(R.color.pastelkirmizi),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-                is GroupListState.Success -> {
-                    if (groupListState.groups.isEmpty()) {
-                        EmptyGroupState()
+            }
+            1 -> {
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                        .background(colorResource(R.color.beyaz))
+                        .padding(20.dp)
+                ) {
+                    if (myGroups.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyGroupState(selectedTab)
+                        }
                     } else {
-                        GroupHabitCard(groupListState.groups, groupsAddViewModel = viewModel,navController)
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            items(myGroups) { group ->
+                                GroupCard(
+                                    group = group,
+                                    groupsAddViewModel = viewModel,
+                                    navController = navController
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -122,9 +216,9 @@ fun GroupListScreen(
 }
 
 @Composable
-fun Groupcategory() {
-    val groupList = listOf("Özel" ,"Açık","Spor", "Eğitim", "Sanat", "Teknoloji", "Seyahat", "Diğer")
-    var selectedCategory by remember { mutableStateOf<String?>(null) }
+fun Groupcategory(viewModel: GroupsAddViewModel) {
+    val groupList = listOf("Tümü", "Özel", "Açık", "Spor", "Eğitim", "Sanat", "Teknoloji", "Seyahat", "Diğer")
+    var selectedCategory by remember { mutableStateOf<String?>("Tümü") }
 
     LazyRow(
         modifier = Modifier
@@ -136,7 +230,10 @@ fun Groupcategory() {
             CategoryChip(
                 category = categoryItem,
                 isSelected = selectedCategory == categoryItem,
-                onSelected = { selectedCategory = categoryItem }
+                onSelected = { 
+                    selectedCategory = categoryItem
+                    viewModel.setCategory(categoryItem)
+                }
             )
         }
     }
@@ -167,18 +264,6 @@ fun CategoryChip(
 }
 
 @Composable
-fun GroupHabitCard(groupList: List<Group>, groupsAddViewModel: GroupsAddViewModel , navController: NavController) {
-    LazyColumn(
-        modifier = Modifier.padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(groupList) { group ->
-            GroupCard(group = group, groupsAddViewModel = groupsAddViewModel,navController)
-        }
-    }
-}
-
-@Composable
 fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navController: NavController) {
     val profileImages = groupsAddViewModel.profileImages.collectAsState().value
     val creatorProfileImage = profileImages[group.createdBy] ?: ""
@@ -192,6 +277,7 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
             .fillMaxWidth()
             .height(150.dp)
             .clickable { navController.navigate("GroupDetailScreen/${group.groupId}") },
+        border = BorderStroke(width = 0.2.dp , color = colorResource(R.color.yazirengi)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colorResource(R.color.gri)),
         elevation = CardDefaults.cardElevation(4.dp)
@@ -381,7 +467,7 @@ private fun getCategoryColor(category: String): Color {
 }
 
 @Composable
-fun EmptyGroupState() {
+fun EmptyGroupState(selectedTab : Int) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -393,7 +479,7 @@ fun EmptyGroupState() {
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                painter = painterResource(R.drawable.personel),
+                painter = painterResource(R.drawable.group),
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = colorResource(R.color.yazirengi).copy(alpha = 0.5f)
@@ -410,7 +496,7 @@ fun EmptyGroupState() {
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "Yeni bir grup oluşturarak başlayabilirsin",
+                text = if (selectedTab == 0) "Yeni bir grup oluşturarak başlayabilirsin" else "Hayde Guruplara katılarak alışkanlıkları yap",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colorResource(R.color.yazirengi).copy(alpha = 0.7f),
                 textAlign = TextAlign.Center

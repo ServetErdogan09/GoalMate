@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.positionInWindow
 
 import androidx.compose.ui.platform.LocalContext
@@ -95,7 +94,12 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.ColorFilter
+import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
+import com.example.goalmate.data.localdata.GroupRequest
+import com.example.goalmate.extrensions.RequestStatus
+import com.example.goalmate.extrensions.RequestsUiState
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -123,7 +127,6 @@ fun HomeScreen(
     Log.e("userName","profileImage : $profileImage")
     Log.e("userName","userName : $userName")
 
-    var starIconPosition by remember { mutableStateOf(Offset.Zero) }
 
     val currentTime by viewModel.currentTime.collectAsState()
 
@@ -147,7 +150,6 @@ fun HomeScreen(
     val isChecked = viewModel.isChecked.collectAsState().value
     var showExplosion by remember { mutableStateOf(false) }
 
-    val totalHabitsPoint by starCoinViewModel.starTotalPoints.collectAsState() // toplam yıldız sayısı
 
     LaunchedEffect(Unit) {
         coroutineScope {
@@ -167,7 +169,7 @@ fun HomeScreen(
         }
     }
 
-    // UI State'i dinle ve değişikliklerde yeniden yükle
+
     LaunchedEffect(uiState) {
         when (uiState) {
             is ExerciseUiState.Success -> {
@@ -200,6 +202,17 @@ fun HomeScreen(
         Log.d("HomeScreen", "Profil resmi güncellendi: $profileImage")
     }
 
+    var showRequestsSheet by remember { mutableStateOf(false) }
+    val requestsState by viewModel.requestsState.collectAsState()
+
+    // Periyodik kontrol için
+    LaunchedEffect(Unit) {
+        while (true) {
+            viewModel.checkDailyProgress()
+            delay(30 * 60 * 1000) // Her 30 dakikada bir kontrol et
+        }
+    }
+
     Scaffold(
         containerColor = colorResource(R.color.arkaplan),
         bottomBar = {
@@ -215,13 +228,6 @@ fun HomeScreen(
 
         Box(Modifier.fillMaxSize()){
 
-            viewModel.starAnimations.forEach { startPosition ->
-                AnimatedStarsSequence(
-                    startPosition = startPosition,
-                    endPosition = starIconPosition,
-                    onAnimationEnd = { viewModel.removeStarAnimation(startPosition) }
-                )
-            }
 
             if (showExplosion) {
                 PatlayanAnimasyon(
@@ -252,7 +258,8 @@ fun HomeScreen(
                         // Profil Resmi ve Hoş Geldin Mesajı
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Start
+                            horizontalArrangement = Arrangement.Start,
+                            modifier = Modifier.weight(1f) // Add weight to take available space
                         ) {
                             // Profil Resmi
                             Image(
@@ -278,20 +285,22 @@ fun HomeScreen(
                                     .clickable {
                                         navController.navigate("UserScreen")
                                     }
-                                    .size(70.dp)
+                                    .size(50.dp)
                                     .clip(CircleShape)
-                                    .border(2.dp, colorResource(R.color.yazirengi), CircleShape)
+                                    .border(1.dp, colorResource(R.color.yazirengi), CircleShape)
                             )
 
-                            Spacer(modifier = Modifier.width(8.dp)) // Resim ile metin arasına boşluk
+                            Spacer(modifier = Modifier.width(12.dp))
 
-                            // Hoş Geldin Mesajı
+                           
                             Column {
                                 Text(
                                     text = userName,
                                     color = colorResource(R.color.yazirengi),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp
+                                    fontSize = 16.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = "Hoş Geldin",
@@ -299,63 +308,49 @@ fun HomeScreen(
                                     fontSize = 14.sp
                                 )
                             }
-
                         }
 
-                        Spacer(modifier = Modifier.width(40.dp))
 
                         Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End,
                             modifier = Modifier
-                                .fillMaxWidth() // Tam genişlik kullanımı
-                                .padding(top = 15.dp, bottom = 15.dp)
+                                .padding(start = 8.dp)
+                                .width(130.dp)
                         ) {
-                            // Puan Bölümü
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.End, // Sağda hizalama
-                                modifier = Modifier.weight(1f) // Puanı sağa it
+                            Box(
+                                modifier = Modifier
+                                    .size(30.dp)
+                                    .clickable { showRequestsSheet = true }
                             ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.starsolid), // Yıldız ikonu
-                                    contentDescription = "yıldız",
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .onGloballyPositioned { coordinates ->
-                                            // Merkez pozisyonunu hesapla
-                                            starIconPosition = coordinates
-                                                .positionInRoot()
-                                                .let {
-                                                    Offset(
-                                                        it.x + coordinates.size.width / 2,
-                                                        it.y + coordinates.size.height / 2
-                                                    )
-                                                }
-                                        }
+                                Icon(
+                                    painter = painterResource(id = R.drawable.message),
+                                    contentDescription = "Message",
+                                    tint = colorResource(R.color.sarı),
+                                    modifier = Modifier.size(30.dp)
                                 )
-
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Log.e("starTotalPoints", "starTotalPoints: $totalHabitsPoint")
-                                Text(
-                                    text = "${totalHabitsPoint ?:0}",
-                                    color = colorResource(R.color.yazirengi),
-                                    fontWeight = FontWeight.Bold,
-                                    overflow = TextOverflow.Visible,
-                                    maxLines = 1,
-                                    textAlign = TextAlign.Start
-                                )
+                                
+                                if (((requestsState as? RequestsUiState.Success)?.unreadCount ?: 0) > 0) {
+                                    Badge(
+                                        containerColor = colorResource(R.color.pastelkirmizi),
+                                        modifier = Modifier.align(Alignment.TopEnd)
+                                    ) {
+                                        Text(
+                                            text = "${(requestsState as RequestsUiState.Success).unreadCount}",
+                                            color = Color.White,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
                             }
 
-                            Spacer(modifier = Modifier.width(40.dp))
+                            Spacer(modifier = Modifier.width(30.dp))
 
-                            // Coin Bölümü
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.End, // Sağda hizalama
-                                modifier = Modifier.weight(1f) // Coin'i de sağa it
                             ) {
                                 Image(
-                                    painter = painterResource(id = R.drawable.sackdollar), // Coin ikonu
+                                    painter = painterResource(id = R.drawable.sackdollar),
                                     contentDescription = "Coin",
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -363,12 +358,10 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
 
                                 Text(
-                                    text = "0", // Coin değeri
+                                    text = "0",
                                     color = colorResource(R.color.yazirengi),
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    modifier = Modifier.width(80.dp), // Sabit genişlik
-                                    textAlign = TextAlign.Start
+                                    fontSize = 14.sp
                                 )
                             }
                         }
@@ -543,6 +536,21 @@ fun HomeScreen(
         }
 
     }
+
+    if (showRequestsSheet) {
+        RequestsBottomSheet(
+            requestsState = requestsState,
+            onDismiss = { showRequestsSheet = false },
+            onRequestClick = { request -> 
+                navController.navigate("requestDetails/${request.id}")
+            },
+            onViewAllClick = {
+                navController.navigate("allRequests")
+                showRequestsSheet = false
+            }
+        )
+    }
+
 }
 
 
@@ -991,27 +999,7 @@ fun completionStatus(startMillis: Long, finishMillis: Long, completedDays: Int):
 
 
 
-@Composable
-fun AnimatedStarsSequence(
-    startPosition: Offset,
-    endPosition: Offset,
-    onAnimationEnd: () -> Unit
-) {
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // 8 tane yıldız animasyonu için başlangıç konumları
-        val starPositions = List(8) { startPosition }
 
-        // Yıldızları sırayla animasyonla hareket ettiriyoruz
-        starPositions.forEachIndexed { index, position ->
-            AnimatedStar(
-                startPosition = position,
-                endPosition = endPosition,
-                delayMillis = index.toLong() * 300, // Gecikme, her yıldız için biraz hızlanacak
-                onAnimationEnd = onAnimationEnd
-            )
-        }
-    }
-}
 
 @Composable
 fun AnimatedStar(
@@ -1248,6 +1236,168 @@ fun calculateProgress(completedDays: Int, finishMillis : Long, startMillis : Lon
         profileImage.toInt()
     } catch (e: NumberFormatException) {
         defaultResId
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RequestsBottomSheet(
+    requestsState: RequestsUiState,
+    onDismiss: () -> Unit,
+    onRequestClick: (GroupRequest) -> Unit,
+    onViewAllClick: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = colorResource(R.color.beyaz),
+        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Grup İstekleri",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colorResource(R.color.yazirengi)
+                )
+                
+                TextButton(
+                    onClick = onViewAllClick
+                ) {
+                    Text(
+                        text = "Tümünü Gör",
+                        color = colorResource(R.color.kutubordrengi)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            when (requestsState) {
+                is RequestsUiState.Loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                
+                is RequestsUiState.Success -> {
+                    if (requestsState.requests.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Henüz hiç istek yok",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = colorResource(R.color.yazirengi)
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 300.dp)
+                        ) {
+                            itemsIndexed(requestsState.requests.take(3)) { _, request ->
+                                RequestItem(
+                                    request = request,
+                                    onClick = { onRequestClick(request) }
+                                )
+                                HorizontalDivider(color = colorResource(R.color.yazirengi).copy(alpha = 0.2f))
+                            }
+                        }
+                    }
+                }
+                
+                is RequestsUiState.Error -> {
+                    Text(
+                        text = requestsState.message,
+                        color = colorResource(R.color.pastelkirmizi),
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun RequestItem(
+    request: GroupRequest,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp, horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Profil resmi
+        AsyncImage(
+            model = request.senderImage ?: R.drawable.personel,
+            contentDescription = "Profile Image",
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = request.senderName,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colorResource(R.color.yazirengi)
+            )
+            Text(
+                text = "${request.groupName} grubuna katılmak istiyor",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colorResource(R.color.yazirengi).copy(alpha = 0.7f)
+            )
+        }
+
+        when (request.status) {
+            RequestStatus.PENDING -> {
+                Icon(
+                    painter = painterResource(R.drawable.baseline_info_24),
+                    contentDescription = "Pending",
+                    tint = colorResource(R.color.sarı),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            RequestStatus.ACCEPTED -> {
+                Icon(
+                    painter = painterResource(R.drawable.baseline_check_24),
+                    contentDescription = "Accepted",
+                    tint = colorResource(R.color.yesil),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            RequestStatus.REJECTED -> {
+                Icon(
+                    painter = painterResource(R.drawable.close),
+                    contentDescription = "Rejected",
+                    tint = colorResource(R.color.pastelkirmizi),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
     }
 }
 

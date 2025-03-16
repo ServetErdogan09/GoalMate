@@ -1,10 +1,14 @@
 package com.example.goalmate.prenstatntion.MainActivity
 
+import AllRequestsScreen
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -65,19 +69,186 @@ import com.example.goalmate.presentation.GroupsListScreen.GroupListScreen
 import com.example.goalmate.utils.CloudinaryConfig
 import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.google.firebase.auth.FirebaseAuth
+import android.Manifest
+import android.app.AlertDialog
+import android.content.pm.PackageManager
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.core.app.NotificationCompat
+import com.example.goalmate.service.FirebaseMessagingService
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @RequiresApi(Build.VERSION_CODES.O)
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // bildiirim izin verildiyse tokunu güncele
+            updateFCMToken()
+            Log.d("Notification", "Bildirim izni verildi")
+        } else {
+            // İzin reddedildi kullanıcıyı bilgilendir
+            Toast.makeText(
+                this,
+                "Bildirimleri almak için izin vermeniz gerekiyor. Ayarlardan izin verebilirsiniz.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+   // tokunu güncele
+    private fun updateFCMToken() {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val token = task.result
+                Log.d("FCM", "New token: $token")
+                
+                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                if (userId != null) {
+                    FirebaseFirestore.getInstance().collection("users").document(userId)
+                        .update(
+                            mapOf(
+                                "fcmToken" to token,
+                                "lastTokenUpdate" to System.currentTimeMillis()
+                            )
+                        )
+                        .addOnSuccessListener {
+                            Log.d("FCM", "Token updated successfully")
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("FCM", "Token update failed", e)
+                        }
+                }
+            } else {
+                Log.e("FCM", "Failed to get FCM token", task.exception)
+            }
+        }
+    }
+
+    // Bildirim iznini kontrol et
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        }
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                AlertDialog.Builder(this)
+                    .setTitle("Bildirim İzni Gerekli")
+                    .setMessage("Grup isteklerini ve önemli güncellemeleri alabilmek için bildirim iznine ihtiyacımız var.")
+                    .setPositiveButton("İzin Ver") { _, _ ->
+                        requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    .setNegativeButton("Şimdi Değil") { dialog, _ ->
+                        dialog.dismiss()
+                    }
+                    .show()
+            } else {
+                updateFCMToken()
+            }
+        } else {
+            updateFCMToken()
+        }
+    }
+
+
+
+    /*
+    private fun testNotification() {
+        // Manuel bildirim testi
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        val notification = NotificationCompat.Builder(this, "group_notifications")
+            .setContentTitle("Test Bildirimi 2222222")
+            .setContentText("Bu bir test bildirimidir")
+            .setSmallIcon(R.drawable.goal_mate)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(1, notification)
+        Log.d(TAG, "Test notification displayed")
+    }
+
+     */
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Test için FCM service'i başlatalım
+        val fcmService = FirebaseMessagingService()
+       // fcmService.testLogging()
+        
+        // FCM token'ı manuel olarak alalım ve loglayalım
+        FirebaseMessaging.getInstance().token
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Log.e("FCM", "Token: ${task.result}")
+                } else {
+                    Log.e("FCM", "Token failed", task.exception)
+                }
+            }
+
+        // Bildirim izinlerini kontrol et
+        checkNotificationPermission()
+
+        // Bildirim izni kontrolü
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != 
+                PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            } else {
+                // İzin varsa test bildirimi göster
+               // testNotification()
+            }
+        } else {
+           // testNotification()
+        }
+
+        askNotificationPermission() // İzin kontrolü yap
         enableEdgeToEdge()
         setContent {
             YeniProjeTheme {
                 ChangingScreen()
-
             }
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    private fun requestNotificationPermission() {
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                1001
+            )
+        }
+    }
+
+    companion object {
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 123
     }
 }
 
@@ -104,29 +275,48 @@ fun ChangingScreen() {
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Idle -> {
-                // Sadece WelcomeScreen'den veya LoginScreen'den geliyorsa yönlendir
-                val currentRoute = navController.currentBackStackEntry?.destination?.route
-                if (currentRoute == "WelcomeScreen" || currentRoute == "LoginScreen") {
-                    if (auth.currentUser == null) {
-                        navController.navigate("WelcomeScreen") {
-                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                        }
-                    } else {
-                        // Kullanıcı giriş yapmışsa HomeScreen'e yönlendir
-                        navController.navigate("HomeScreen") {
-                            popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                try {
+                    // Mevcut rotayı güvenli bir şekilde al
+                    val currentRoute = navController.currentBackStackEntry?.destination?.route
+                    
+                    // Sadece belirli ekranlardan geliyorsa yönlendirme yap
+                    if (currentRoute == "WelcomeScreen" || currentRoute == "LoginScreen") {
+                        if (auth.currentUser == null) {
+                            navController.navigate("WelcomeScreen") {
+                                // Önceki destinationları temizle
+                                popUpTo("LoginScreen") { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        } else {
+                            navController.navigate("HomeScreen") {
+                                // Önceki destinationları temizle
+                                popUpTo("LoginScreen") { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    Log.e("Navigation", "Navigation error", e)
                 }
             }
             is AuthState.Success -> {
-                navController.navigate("HomeScreen") {
-                    popUpTo("LoginScreen") { inclusive = true }
+                try {
+                    navController.navigate("HomeScreen") {
+                        popUpTo("LoginScreen") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("Navigation", "Navigation error", e)
                 }
             }
             is AuthState.VerificationRequired -> {
-                navController.navigate("verification") {
-                    popUpTo("LoginScreen") { inclusive = true }
+                try {
+                    navController.navigate("verification") {
+                        popUpTo("LoginScreen") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                } catch (e: Exception) {
+                    Log.e("Navigation", "Navigation error", e)
                 }
             }
             else -> {}
@@ -220,6 +410,7 @@ fun ChangingScreen() {
                 GroupsAdd(navController , viewModel = groupsAddViewModel)
             }
 
+
             composable(route = "GroupListScreen") {
                 GroupListScreen(navController, viewModel = groupsAddViewModel , registerViewModel = registerViewModel)
             }
@@ -250,6 +441,10 @@ fun ChangingScreen() {
             ) {backStackEntry->
                 val groupId = backStackEntry.arguments?.getString("groupId")?:""
                 GroupDetailScreen(groupId = groupId,navController , groupsAddViewModel)
+            }
+
+            composable(route = "allRequests") {
+                AllRequestsScreen(habitViewModel,navController)
             }
 
         }
