@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
+import androidx.room.Index
 import com.example.goalmate.extrensions.RequestStatus
 import com.google.firebase.database.IgnoreExtraProperties
 
@@ -78,7 +79,8 @@ data class RegistrationData(
     val gender: String = "",
     val birthDay: String = "",
     val birthMonth: String = "",
-    val birthYear: String = ""
+    val birthYear: String = "",
+    val maxAllowedGroups :Int = 3
 )
 
 
@@ -88,6 +90,7 @@ data class GroupHabit(
     val finishDate: Long,  // Bitiş tarihi (milisaniye)
     val completedDays: Int = 0,  // Tamamlanan gün sayısı
 )
+
 
 @IgnoreExtraProperties
 data class Group(
@@ -102,12 +105,22 @@ data class Group(
     val createdAt: Long = 0,
     val habitDuration: String,
     val createdBy: String = "",
+    val quote: String = "",
     val members: List<String> = emptyList(),
-
-    ){
-    constructor() : this("", "", "", "", false, "", 0, "", 0, "", "", emptyList())
+) {
+    constructor() : this("", "", "", "", false, "", 0, "", 0, "", "", "", emptyList())
 }
 
+
+@Entity(
+    tableName = "motivation_quotes",
+    indices = [Index(value = ["category"])]
+)
+data class MotivationQuote(
+    @PrimaryKey val id: String = "",
+    val category: String = "",
+    val quote: String = ""
+)
 
 data class GroupRequest(
     val id: String,

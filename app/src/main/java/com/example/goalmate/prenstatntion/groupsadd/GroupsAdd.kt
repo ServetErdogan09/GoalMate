@@ -28,22 +28,29 @@ import kotlinx.coroutines.launch
 import androidx.navigation.NavController
 import com.example.goalmate.extrensions.GroupCreationState
 import com.example.goalmate.viewmodel.GroupsAddViewModel
+import com.example.goalmate.viewmodel.MotivationQuoteViewModel
+import com.example.goalmate.viewmodel.RegisterViewModel
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupsAdd(
     navController: NavController,
     viewModel: GroupsAddViewModel = viewModel(),
+    registerViewModel: RegisterViewModel = viewModel(),
+    motivationQuoteViewModel: MotivationQuoteViewModel
 ) {
     var groupName by remember { mutableStateOf("") }
     var frequency by remember { mutableStateOf("Günlük") }
     var participationType by remember { mutableStateOf("Onay") }
     var isPrivate by remember { mutableStateOf(false) }
     var participantNumber by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Spor") }
+    var selectedCategory by remember { mutableStateOf("Sağlık") }
     var groupDescription by remember { mutableStateOf("") }
     var habitHours by remember { mutableStateOf("") }
     var habitMinutes by remember { mutableStateOf("") }
+
+
     
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -56,6 +63,11 @@ fun GroupsAdd(
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     val groupCreationState by viewModel.groupCreationState.collectAsState()
+
+
+    val joinedGroupsCount by registerViewModel.joinedGroupsCount.collectAsState()
+    val maxAllowedGroups by registerViewModel.maxAllowedGroups.collectAsState()
+
 
 
     LaunchedEffect(groupCreationState) {
@@ -150,7 +162,7 @@ fun GroupsAdd(
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Kategori") },
-                    trailingIcon = { 
+                    trailingIcon = {
                         Icon(
                             Icons.Filled.ArrowDropDown,
                             contentDescription = null,
@@ -171,7 +183,7 @@ fun GroupsAdd(
                     onDismissRequest = { expanded = false },
                     containerColor = colorResource(R.color.gri)
                 ) {
-                    listOf("Spor", "Eğitim", "Sanat", "Teknoloji", "Seyahat","Diğer").forEach { category ->
+                    listOf("Sağlık", "Kişisel Gelişim", "Sosyal İlişkiler", "Finans","Kariyer" , "Teknoloji", "Çevre","Diğer").forEach { category ->
                         DropdownMenuItem(
                             text = { Text(category) },
                             onClick = {
@@ -271,9 +283,9 @@ fun GroupsAdd(
                                     unfocusedBorderColor = MaterialTheme.colorScheme.outline
                                 )
                             )
-                            
+
                             Text(":", color = textColor)
-                            
+
                             OutlinedTextField(
                                 value = habitMinutes,
                                 onValueChange = { newValue ->
@@ -283,7 +295,7 @@ fun GroupsAdd(
                                         // İlk karakterin 0-5 olmasını kontrol et
                                         if (newValue.length == 1 && newValue[0].isDigit() && newValue[0].toString().toInt() <= 5) {
                                             habitMinutes = newValue
-                                        } 
+                                        }
                                         // İkinci karakterin 0-9 olmasını kontrol et
                                         else if (newValue.length == 2 && newValue.last().isDigit()) {
                                             habitMinutes = newValue
@@ -320,7 +332,7 @@ fun GroupsAdd(
                         ) {
                             ElevatedFilterChip(
                                 selected = !isPrivate,
-                                onClick = { 
+                                onClick = {
                                     isPrivate = false
                                     participationType = "Herkes"
                                 },
@@ -332,7 +344,7 @@ fun GroupsAdd(
                             )
                             ElevatedFilterChip(
                                 selected = isPrivate,
-                                onClick = { 
+                                onClick = {
                                     isPrivate = true
                                     participationType = "Onay"
                                 },
@@ -525,8 +537,17 @@ fun GroupsAdd(
 
             // Oluştur Butonu
             Button(
-                onClick = { 
+                onClick = {
                     when {
+                        !registerViewModel.canJoinMoreGroups() -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Maksimum grup limitine ulaştınız ($joinedGroupsCount/$maxAllowedGroups). " +
+                                            "Yeni bir grup oluşturmak için önce bir gruptan ayrılmalısınız.",
+                                    duration = SnackbarDuration.Long
+                                )
+                            }
+                        }
                         groupName.isBlank() -> {
                             scope.launch {
                                 snackbarHostState.showSnackbar(
@@ -571,37 +592,69 @@ fun GroupsAdd(
                                 }
                                 return@Button
                             }
-                            viewModel.createGroup(
-                                groupName = groupName,
-                                category = selectedCategory,
-                                frequency = frequency,
-                                isPrivate = isPrivate,
-                                participationType = participationType,
-                                participantNumber = participantNumber.toInt(),
-                                description = groupDescription,
-                                habitDuration = totalMinutes.toString(),
-                                context = context
-                            )
+
+                            // Grup oluşturma işlemi öncesi son bir kontrol daha yapalım
+                            if (joinedGroupsCount >= maxAllowedGroups) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Maksimum grup limitine ulaştınız ($joinedGroupsCount/$maxAllowedGroups)",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                                return@Button
+                            }
+
+                            scope.launch {
+                                try {
+                                    val groupId = viewModel.createGroup(
+                                        groupName = groupName,
+                                        category = selectedCategory,
+                                        frequency = frequency,
+                                        isPrivate = isPrivate,
+                                        participationType = participationType,
+                                        participantNumber = participantNumber.toInt(),
+                                        description = groupDescription,
+                                        habitDuration = totalMinutes.toString(),
+                                        context = context
+                                    )
+                                    
+                                    // Grup oluşturma başarılı olduğunda motivasyon sözünü kaydet
+                                    if (groupId != null) {
+                                        Log.d("GroupsAdd", "Grup başarıyla oluşturuldu, ID: $groupId")
+                                        Log.d("GroupsAdd", "Motivasyon sözü kaydediliyor... Kategori: $selectedCategory")
+                                        motivationQuoteViewModel.saveQuoteForGroup(groupId = groupId, category = selectedCategory)
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("GroupsAdd", "Grup oluşturma veya söz kaydetme hatası", e)
+                                    snackbarHostState.showSnackbar(
+                                        message = "Grup oluşturulurken bir hata oluştu: ${e.message}",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
+                            }
                         }
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
+                enabled = registerViewModel.canJoinMoreGroups(),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = colorResource(R.color.kutubordrengi)
+                    containerColor = colorResource(R.color.kutubordrengi),
+                    disabledContainerColor = Color.Gray
                 ),
                 elevation = ButtonDefaults.buttonElevation(
                     defaultElevation = 4.dp
                 )
             ) {
                 Text(
-                    text = "Grubu Oluştur",
+                    text = "Grubu Oluştur ($joinedGroupsCount/$maxAllowedGroups)",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
             }
+
         }
     }
 }

@@ -156,7 +156,8 @@ fun GroupListScreen(
                                     }
 
                                     item {
-                                        if (groupListState.groups.isNotEmpty()) {
+                                        val hasMoreData by viewModel.hasMoreData.collectAsState()
+                                        if (hasMoreData) {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -217,24 +218,52 @@ fun GroupListScreen(
 
 @Composable
 fun Groupcategory(viewModel: GroupsAddViewModel) {
-    val groupList = listOf("Tümü", "Özel", "Açık", "Spor", "Eğitim", "Sanat", "Teknoloji", "Seyahat", "Diğer")
-    var selectedCategory by remember { mutableStateOf<String?>("Tümü") }
+    val groupList = listOf("Tümü", "Özel", "Açık", "Sağlık", "Kişisel Gelişim", "Sosyal ilişkiler", "Finans","Kariyer" , "Teknoloji", "Çevre","Diğer")
+    var selectedMainCategory by remember { mutableStateOf<String?>("Tümü") }
+    var selectedPrivacy by remember { mutableStateOf<String?>(null) }
 
-    LazyRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        items(groupList) { categoryItem ->
-            CategoryChip(
-                category = categoryItem,
-                isSelected = selectedCategory == categoryItem,
-                onSelected = { 
-                    selectedCategory = categoryItem
-                    viewModel.setCategory(categoryItem)
+    Column {
+        // Ana kategori seçimi
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(groupList.filter { it != "Özel" && it != "Açık" }) { categoryItem ->
+                CategoryChip(
+                    category = categoryItem,
+                    isSelected = selectedMainCategory == categoryItem && selectedPrivacy == null,
+                    onSelected = { 
+                        selectedMainCategory = categoryItem
+                        selectedPrivacy = null
+                        viewModel.setFilters(categoryItem)
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Privacy seçimi
+        if (selectedMainCategory != "Tümü") {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(listOf("Özel", "Açık")) { privacyItem ->
+                    CategoryChip(
+                        category = "$selectedMainCategory $privacyItem",
+                        isSelected = selectedPrivacy == privacyItem,
+                        onSelected = {
+                            selectedPrivacy = privacyItem
+                            viewModel.setFilters(privacyItem)
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }
@@ -333,7 +362,7 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                     )
                 }
 
-                // Alt Kısım - Grup Lideri ve Durum Bilgileri
+                // Alt Kısım -  Grup Lideri - Durum Bilgileri
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -416,7 +445,7 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                                 containerColor = if (group.isPrivate) 
                                     colorResource(R.color.kirmizi).copy(alpha = 0.1f)
                                 else 
-                                    colorResource(R.color.yesil).copy(alpha = 0.1f)
+                                    colorResource(R.color.yesil2).copy(alpha = 0.2f)
                             )
                         ) {
                             Row(
@@ -434,14 +463,14 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                                     tint = if (group.isPrivate) 
                                         colorResource(R.color.pastelkirmizi)
                                     else 
-                                        colorResource(R.color.yesil)
+                                        colorResource(R.color.yesil2)
                                 )
                                 Text(
                                     text = if (group.isPrivate) "Özel" else "Açık",
                                     color = if (group.isPrivate) 
                                         colorResource(R.color.pastelkirmizi)
                                     else 
-                                        colorResource(R.color.yesil),
+                                        colorResource(R.color.yesil2),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
