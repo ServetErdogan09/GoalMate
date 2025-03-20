@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CancellationException as JobCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.goalmate.data.localdata.RegistrationData
@@ -34,6 +35,10 @@ import com.cloudinary.android.callback.ErrorInfo
 import com.cloudinary.android.callback.UploadCallback
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.delay
+import androidx.core.content.edit
+import androidx.core.net.toUri
+import com.example.goalmate.data.localdata.Group
+import kotlinx.coroutines.SupervisorJob
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
@@ -62,11 +67,19 @@ class RegisterViewModel @Inject constructor(
     val profileImage: StateFlow<String> = _profileImage.asStateFlow()
 
 
+    private val _maxAllowedGroups  = MutableStateFlow<Int>(3)
+    val maxAllowedGroups : StateFlow<Int> = _maxAllowedGroups.asStateFlow()
+
+
     private val _showPasswordDialog = MutableStateFlow(false)
     val showPasswordDialog: StateFlow<Boolean> = _showPasswordDialog.asStateFlow()
 
     private val _tempPassword = MutableStateFlow("")
     val tempPassword: StateFlow<String> = _tempPassword.asStateFlow()
+
+    // Yeni StateFlow ekleyelim
+    private val _joinedGroupsCount = MutableStateFlow(0)
+    val joinedGroupsCount: StateFlow<Int> = _joinedGroupsCount.asStateFlow()
 
     init {
         _userName.value = getLocalUserName(context)
@@ -100,18 +113,29 @@ class RegisterViewModel @Inject constructor(
                     if (document.exists()) {
                         val firebaseName = document.getString("name")
                         val firebaseProfileImage = document.getString("profileImage")
-
+                        
                         // Firebase'den gelen verileri kontrol et ve güncelle
                         if (!firebaseName.isNullOrEmpty()) {
                             _userName.value = firebaseName
-                            sharedPreferences.edit().putString("user_name", firebaseName).apply()
+                            sharedPreferences.edit() { putString("user_name", firebaseName) }
                         }
 
                         if (!firebaseProfileImage.isNullOrEmpty()) {
                             _profileImage.value = firebaseProfileImage
-                            sharedPreferences.edit().putString("profileImage", firebaseProfileImage).apply()
+                            sharedPreferences.edit() {
+                                putString("profileImage", firebaseProfileImage)
+                            }
                             Log.d("RegisterViewModel", "Updated profile image from Firebase: $firebaseProfileImage")
                         }
+                        
+                        // Kullanıcının katıldığı grupları ve maksimum grup limitini al
+                        val joinedGroups = document.get("joinedGroups") as? List<*> ?: emptyList<String>()
+                        _joinedGroupsCount.value = joinedGroups.size
+                        
+                        val maxAllowed = document.getLong("maxAllowedGroups")?.toInt() ?: 3
+                        _maxAllowedGroups.value = maxAllowed
+                        
+                        Log.d("RegisterViewModel", "User joined groups: ${joinedGroups.size}/$maxAllowed")
                     }
                 }
             } catch (e: Exception) {
@@ -128,14 +152,54 @@ class RegisterViewModel @Inject constructor(
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
-                    val name = snapshot.getString("name")
-                    val profileImage = snapshot.getString("profileImage")
-                    if (!name.isNullOrEmpty()) {
-                        _userName.value = name
-                    }
-                    if (!profileImage.isNullOrEmpty()) {
-                        _profileImage.value = profileImage
-                        saveProfileImageToPreferences(context, profileImage)
+                    try {
+                        // Kullanıcının grup listesini al ve detaylı kontrol et
+                        val rawJoinedGroups = snapshot.get("joinedGroups")
+                        Log.d("RegisterViewModel", "Ham joinedGroups verisi: $rawJoinedGroups")
+                        
+                        val userJoinedGroups = when (rawJoinedGroups) {
+                            is List<*> -> {
+                                // Listedeki her elemanı kontrol et
+                                rawJoinedGroups.filterNotNull().filter { groupId ->
+                                    // groupId'nin geçerli bir string olduğunu kontrol et
+                                    groupId is String && groupId.isNotBlank()
+                                }
+                            }
+                            else -> {
+                                Log.e("RegisterViewModel", "joinedGroups geçerli bir liste değil")
+                                emptyList()
+                            }
+                        }
+
+                        // Kullanıcının kendi limitini al
+                        val userMaxAllowedGroups = snapshot.getLong("maxAllowedGroups")?.toInt() ?: 3
+
+                        Log.d("RegisterViewModel", """
+                            Grup Limit Kontrolü:
+                            - Mevcut Grup Sayısı: ${userJoinedGroups.size}
+                            - Maximum İzin: $userMaxAllowedGroups
+                            - Katılabilir mi: ${userJoinedGroups.size < userMaxAllowedGroups}
+                        """.trimIndent())
+                        
+                        // StateFlow'ları güncelle
+                        viewModelScope.launch {
+                            _joinedGroupsCount.value = userJoinedGroups.size
+                            _maxAllowedGroups.value = userMaxAllowedGroups
+                        }
+
+                        // Diğer kullanıcı bilgilerini güncelle
+                        val name = snapshot.getString("name")
+                        val profileImage = snapshot.getString("profileImage")
+                        
+                        if (!name.isNullOrEmpty()) {
+                            _userName.value = name
+                        }
+                        if (!profileImage.isNullOrEmpty()) {
+                            _profileImage.value = profileImage
+                        }
+
+                    } catch (e: Exception) {
+                        Log.e("RegisterViewModel", "Kullanıcı verilerini işlerken hata: ", e)
                     }
                 }
             }
@@ -300,7 +364,7 @@ class RegisterViewModel @Inject constructor(
 
     private fun clearRegistrationDataFromPrefs(context: Context) {
         val sharedPreferences = context.getSharedPreferences("registration_data", Context.MODE_PRIVATE)
-        sharedPreferences.edit().clear().apply()
+        sharedPreferences.edit() { clear() }
     }
 
     private fun saveRegistrationDataToPrefs(context: Context, data: RegistrationData) {
@@ -313,6 +377,7 @@ class RegisterViewModel @Inject constructor(
             putString("birthDay", data.birthDay)
             putString("birthMonth", data.birthMonth)
             putString("birthYear", data.birthYear)
+            putString("maxAllowedGroups", data.maxAllowedGroups.toString())
             apply()
         }
     }
@@ -370,6 +435,23 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
+
+    // guruba katılma code oluşturacak
+    fun createGroupCode(groupId: String) {
+       val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+       val newCode =  (1..8).map { chars.random() }.joinToString("")
+       Log.d("groupCode", "Oluşturulan grup kodu: $newCode")
+        db.collection("groups").document(groupId)
+            .update("groupCode",newCode)
+            .addOnSuccessListener {
+                Log.d("Firebase", "Grup kodu güncellendi: $newCode")
+            }
+            .addOnFailureListener {e->
+                Log.e("Firebase", "Grup kodu güncellenirken hata oluştu: $e")
+
+            }
+    }
+
     fun saveUserToFirestore(userId: String, context: Context) {
         viewModelScope.launch {
             try {
@@ -407,7 +489,8 @@ class RegisterViewModel @Inject constructor(
                             "createdAt" to System.currentTimeMillis(),
                             "updatedAt" to System.currentTimeMillis(),
                             "joinedGroups" to listOf<String>(),
-                            "fcmToken" to fcmToken
+                            "fcmToken" to fcmToken,
+                            "maxAllowedGroups" to 3 // başlangıç olarka 3 guruba katılabilecek
                         )
 
                         Log.d("RegisterViewModel", "Prepared user data: $userData")
@@ -462,7 +545,7 @@ class RegisterViewModel @Inject constructor(
 
 
     fun updateProfileImage(imageUri: String, context: Context) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO + SupervisorJob()) {
             try {
                 Log.d("RegisterViewModel", "Profil resmi güncelleniyor: $imageUri")
                 
@@ -470,44 +553,58 @@ class RegisterViewModel @Inject constructor(
                     // Avatar seçilmişse (resource ID)
                     imageUri.all { it.isDigit() } -> {
                         Log.d("RegisterViewModel", "Avatar seçildi, ID: $imageUri")
-                        imageUri // Resource ID'yi doğrudan kullan
+                        imageUri
                     }
                     
-
                     imageUri.startsWith("content") -> {
                         Log.d("RegisterViewModel", "Galeri resmi Cloudinary'ye yükleniyor")
-                        uploadImageToCloudinary(context, Uri.parse(imageUri))?.also {
-                            Log.d("RegisterViewModel", "Cloudinary URL: $it")
-                        } ?: run {
-                            Log.e("RegisterViewModel", "Resim yüklenemedi")
-                            return@launch
-                        }
+                        withContext(Dispatchers.IO) {
+                            uploadImageToCloudinary(context, Uri.parse(imageUri))?.also {
+                                Log.d("RegisterViewModel", "Cloudinary URL: $it")
+                            } ?: run {
+                                Log.e("RegisterViewModel", "Resim yüklenemedi")
+                                return@withContext null
+                            }
+                        } ?: return@launch
                     }
                     
-
                     else -> imageUri
                 }
                 
-                // StateFlow'u güncelle
-                _profileImage.value = finalImagePath
-                
-                // SharedPreferences'a kaydet
-                val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                sharedPreferences.edit().putString("profileImage", finalImagePath).apply()
+                withContext(Dispatchers.Main) {
+                    // StateFlow'u güncelle
+                    _profileImage.value = finalImagePath
+                    
+                    // SharedPreferences'a kaydet
+                    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                    sharedPreferences.edit().putString("profileImage", finalImagePath).apply()
+                }
                 
                 // Firestore'a kaydet
                 auth.currentUser?.let { user ->
-                    db.collection("users").document(user.uid)
-                        .update(mapOf(
-                            "profileImage" to finalImagePath,
-                            "lastUpdated" to System.currentTimeMillis()
-                        )).await()
-                    
-                    Log.d("RegisterViewModel", "Profil resmi başarıyla güncellendi: $finalImagePath")
+                    try {
+                        withContext(Dispatchers.IO) {
+                            db.collection("users").document(user.uid)
+                                .update(mapOf(
+                                    "profileImage" to finalImagePath,
+                                    "lastUpdated" to System.currentTimeMillis()
+                                ))
+                                .await()
+                            
+                            Log.d("RegisterViewModel", "Profil resmi başarıyla güncellendi: $finalImagePath")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("RegisterViewModel", "Firestore güncelleme hatası", e)
+                        throw e
+                    }
                 }
                 
             } catch (e: Exception) {
-                Log.e("RegisterViewModel", "Profil resmi güncellenirken hata oluştu", e)
+                if (e is JobCancellationException) {
+                    Log.w("RegisterViewModel", "Profil resmi güncelleme işlemi iptal edildi", e)
+                } else {
+                    Log.e("RegisterViewModel", "Profil resmi güncellenirken hata oluştu", e)
+                }
             }
         }
     }
@@ -700,13 +797,38 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    private fun saveProfileImageToPreferences(context: Context, imageUri: String) {
-        val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        with(sharedPreferences.edit()) {
-            putString("profileImage", imageUri)
-            apply()
+    fun updateProfileImageInFirestore(imageUri: String) {
+        viewModelScope.launch {
+            try {
+                auth.currentUser?.let { user ->
+                    db.collection("users").document(user.uid)
+                        .update("profileImage", imageUri)
+                        .await()
+                    
+                    // StateFlow'u güncelle
+                    _profileImage.value = imageUri
+                    
+                    Log.d("RegisterViewModel", "Profile image updated in Firestore: $imageUri")
+                }
+            } catch (e: Exception) {
+                Log.e("RegisterViewModel", "Error updating profile image in Firestore", e)
+            }
         }
-        Log.d("RegisterViewModel", "Profil resmi SharedPreferences'a kaydedildi: $imageUri")
+    }
+
+    fun canJoinMoreGroups(): Boolean {
+        val currentCount = _joinedGroupsCount.value
+        val maxAllowed = _maxAllowedGroups.value
+        val canJoin = currentCount < maxAllowed
+        
+        Log.d("RegisterViewModel", """
+            Grup Limit Kontrolü:
+            - Mevcut Grup Sayısı: $currentCount
+            - Maximum İzin: $maxAllowed
+            - Katılabilir mi: $canJoin
+        """.trimIndent())
+        
+        return canJoin
     }
 }
 

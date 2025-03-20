@@ -43,7 +43,9 @@ class GroupsAddViewModel @Inject constructor(
     private val PAGE_SIZE = 8
     private var lastDocument: DocumentSnapshot? = null
     private var isLoading = false
-    private var hasMoreData = true
+    private var _hasMoreDataFlag = true
+    private val _hasMoreData = MutableStateFlow(true)
+    val hasMoreData: StateFlow<Boolean> = _hasMoreData.asStateFlow()
 
     private val _groupListState = MutableStateFlow<GroupListState>(GroupListState.Loading)
     val groupListState = _groupListState.asStateFlow()
@@ -58,6 +60,7 @@ class GroupsAddViewModel @Inject constructor(
     val joinGroupState = _joinGroupState.asStateFlow()
 
     private var currentCategory: String = "Tümü"
+    private var currentPrivacy: String? = null
 
     private val _myGroups = MutableStateFlow<List<Group>>(emptyList())
     val myGroups: StateFlow<List<Group>> = _myGroups.asStateFlow()
@@ -65,97 +68,104 @@ class GroupsAddViewModel @Inject constructor(
     private val _requestsState = MutableStateFlow<RequestsUiState>(RequestsUiState.Loading)
     val requestsState = _requestsState.asStateFlow()
 
+    private val _maxAllowedGroups = MutableStateFlow(3)
+    val maxAllowedGroups: StateFlow<Int> = _maxAllowedGroups.asStateFlow()
+
+    private val _joinError = MutableStateFlow<String?>(null)
+    val joinError: StateFlow<String?> = _joinError.asStateFlow()
+
     init {
         getGroupList()
     }
 
-    fun createGroup(
+    suspend fun createGroup(
         groupName: String,
         category: String,
         frequency: String,
         isPrivate: Boolean,
         participationType: String,
         participantNumber: Int,
-        habitDuration : String,
+        habitDuration: String,
         description: String,
         context: Context
-    ) {
-        viewModelScope.launch {
-            _groupCreationState.value = GroupCreationState.Loading
+    ): String? {
+        _groupCreationState.value = GroupCreationState.Loading
 
-            try {
-                if (!isNetworkAvailable(context)) {
-                    _groupCreationState.value = GroupCreationState.NoInternet
-                    return@launch
-                }
-
-                val currentUserId = auth.currentUser?.uid
-                if (currentUserId == null) {
-                    _groupCreationState.value = GroupCreationState.Failure("Kullanıcı oturumu bulunamadı")
-                    return@launch
-                }
-
-                val groupId = db.collection("groups").document().id
-                val newGroup = Group(
-                    groupId = groupId,
-                    groupName = groupName,
-                    category = category,
-                    frequency = frequency,
-                    isPrivate = isPrivate,
-                    participationType = participationType,
-                    participantNumber = participantNumber,
-                    description = description,
-                    createdAt = System.currentTimeMillis(),
-                    createdBy = currentUserId,
-                    habitDuration = habitDuration,
-                    members = listOf(currentUserId)
-                )
-
-                val groupData = hashMapOf(
-                    "groupId" to groupId,
-                    "groupName" to groupName,
-                    "category" to category,
-                    "frequency" to frequency,
-                    "isPrivate" to isPrivate,
-                    "participationType" to participationType,
-                    "participantNumber" to participantNumber,
-                    "description" to description,
-                    "createdAt" to System.currentTimeMillis(),
-                    "createdBy" to currentUserId,
-                    "habitDuration" to habitDuration,
-                    "members" to listOf(currentUserId)
-                )
-
-                db.collection("groups").document(groupId)
-                    .set(groupData)
-                    .addOnSuccessListener {
-                        viewModelScope.launch {
-                            // Mevcut grup listesini güncelle
-                            val currentGroups = (_groupListState.value as? GroupListState.Success)?.groups ?: emptyList()
-                            val updatedGroups = listOf(newGroup) + currentGroups
-                            _groupListState.value = GroupListState.Success(updatedGroups)
-                            
-                            // Kullanıcının gruplarını güncelle
-                            val currentUserGroups = _myGroups.value
-                            _myGroups.value = listOf(newGroup) + currentUserGroups
-
-                            _groupCreationState.value = GroupCreationState.Success(
-                                "Grup başarıyla oluşturuldu!"
-                            )
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        _groupCreationState.value = GroupCreationState.Failure(
-                            "Grup oluşturulurken bir hata oluştu: ${e.message}"
-                        )
-                        Log.e("GroupsAdd", "Error creating group", e)
-                    }
-            } catch (e: Exception) {
-                _groupCreationState.value = GroupCreationState.Failure(
-                    "Beklenmeyen bir hata oluştu: ${e.message}"
-                )
-                Log.e("GroupsAdd", "Unexpected error while creating group", e)
+        try {
+            if (!isNetworkAvailable(context)) {
+                _groupCreationState.value = GroupCreationState.NoInternet
+                return null
             }
+
+            val currentUserId = auth.currentUser?.uid
+            if (currentUserId == null) {
+                _groupCreationState.value = GroupCreationState.Failure("Kullanıcı oturumu bulunamadı")
+                return null
+            }
+
+            // Kullanıcının mevcut grup sayısını ve limitini kontrol et
+            val userDoc = db.collection("users").document(currentUserId).get().await()
+            val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
+            val maxAllowedGroups = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+
+            if (joinedGroups.size >= maxAllowedGroups) {
+                _groupCreationState.value = GroupCreationState.Failure(
+                    "Maksimum grup limitine ulaştınız ($maxAllowedGroups). " +
+                    "Daha fazla grup oluşturmak için limit yükseltmeniz gerekiyor."
+                )
+                return null
+            }
+
+            val groupId = db.collection("groups").document().id
+            val newGroup = Group(
+                groupId = groupId,
+                groupName = groupName,
+                category = category,
+                frequency = frequency,
+                isPrivate = isPrivate,
+                participationType = participationType,
+                participantNumber = participantNumber,
+                description = description,
+                createdAt = System.currentTimeMillis(),
+                createdBy = currentUserId,
+                quote = "",
+                groupCode = "",
+                habitDuration = habitDuration,
+                members = listOf(currentUserId)
+            )
+
+            // Grup oluşturma ve kullanıcı güncelleme işlemlerini transaction içinde yap
+            db.runTransaction { transaction ->
+                val userRef = db.collection("users").document(currentUserId)
+                val groupRef = db.collection("groups").document(groupId)
+                
+                // Grup oluştur
+                transaction.set(groupRef, newGroup)
+                
+                // Kullanıcının katıldığı gruplara ekle
+                transaction.update(userRef, "joinedGroups", joinedGroups + groupId)
+            }.await()
+
+            // UI'ı güncelle
+            val currentGroups = (_groupListState.value as? GroupListState.Success)?.groups ?: emptyList()
+            val updatedGroups = listOf(newGroup) + currentGroups
+            _groupListState.value = GroupListState.Success(updatedGroups)
+            
+            val currentUserGroups = _myGroups.value
+            _myGroups.value = listOf(newGroup) + currentUserGroups
+
+            _groupCreationState.value = GroupCreationState.Success(
+                message = "Grup başarıyla oluşturuldu"
+            )
+
+            return groupId
+
+        } catch (e: Exception) {
+            _groupCreationState.value = GroupCreationState.Failure(
+                e.message ?: "Grup oluşturulurken bir hata oluştu"
+            )
+            Log.e("GroupsAdd", "Error creating group", e)
+            return null
         }
     }
 
@@ -176,7 +186,9 @@ class GroupsAddViewModel @Inject constructor(
                         description = groupDocument.getString("description") ?: "",
                         createdAt = groupDocument.getLong("createdAt") ?: 0,
                         createdBy = groupDocument.getString("createdBy") ?: "",
-                        habitDuration = groupDocument.getString("habitDuration")?:"",
+                        habitDuration = groupDocument.getString("habitDuration") ?: "",
+                        quote = groupDocument.getString("quote") ?: "",
+                        groupCode = groupDocument.getString("groupCode") ?: "",
                         members = (groupDocument.get("members") as? List<String>) ?: emptyList()
                     )
                     _groupDetailState.value = GroupDetailState.Success(group)
@@ -185,7 +197,7 @@ class GroupsAddViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 _groupDetailState.value = GroupDetailState.Error("Grup detayları yüklenirken hata oluştu: ${e.message}")
-                Log.e("getGroupById", "getGroupById : veriler çekilirken hata oluştu")
+                Log.e("getGroupById", "getGroupById : veriler çekilirken hata oluştu", e)
             }
         }
     }
@@ -222,7 +234,7 @@ class GroupsAddViewModel @Inject constructor(
                         getGroupById(groupId)
                         getUsersName(userId)
                         getProfile(userId)
-                        _joinGroupState.value = "Gruba başarıyla katıldınız!"
+                        _joinGroupState.value = "Hoş geldiniz! 🎉 Gruba başarıyla katıldınız, artık bir üyesisiniz!"
                     }
                 }.addOnFailureListener { e ->
                     Log.e("Firestore", "Error joining group", e)
@@ -258,7 +270,7 @@ class GroupsAddViewModel @Inject constructor(
     }
 
     private fun getGroupList(isInitialLoad: Boolean = true) {
-        if (isLoading || (!isInitialLoad && !hasMoreData)) return
+        if (isLoading || (!isInitialLoad && !_hasMoreDataFlag)) return
         isLoading = true
 
         viewModelScope.launch {
@@ -266,8 +278,13 @@ class GroupsAddViewModel @Inject constructor(
                 var query = db.collection("groups")
                     .orderBy("createdAt", Query.Direction.DESCENDING)
 
-                if (currentCategory != "Tümü") {
+                if (currentCategory != "Tümü" && currentCategory != "Özel" && currentCategory != "Açık") {
                     query = query.whereEqualTo("category", currentCategory)
+                }
+
+                if (currentPrivacy != null) {
+                    val isPrivate = currentPrivacy == "Özel"
+                    query = query.whereEqualTo("isPrivate", isPrivate)
                 }
 
                 query = query.limit(PAGE_SIZE.toLong())
@@ -279,7 +296,8 @@ class GroupsAddViewModel @Inject constructor(
                 val snapshot = query.get().await()
                 
                 if (snapshot.isEmpty) {
-                    hasMoreData = false
+                    _hasMoreData.value = false
+                    _hasMoreDataFlag = false
                     return@launch
                 }
 
@@ -299,6 +317,8 @@ class GroupsAddViewModel @Inject constructor(
                             createdAt = document.getLong("createdAt") ?: 0,
                             createdBy = document.getString("createdBy") ?: "",
                             habitDuration = document.getString("habitDuration") ?: "",
+                            quote = document.getString("quote") ?: "",
+                            groupCode = document.getString("groupCode") ?: "",
                             members = (document.get("members") as? List<String>) ?: emptyList()
                         )
                     } catch (e: Exception) {
@@ -326,7 +346,8 @@ class GroupsAddViewModel @Inject constructor(
 
     private fun resetGroupList() {
         lastDocument = null
-        hasMoreData = true
+        _hasMoreDataFlag = true
+        _hasMoreData.value = true
         isLoading = false
         _groupListState.value = GroupListState.Loading
         getGroupList(true)
@@ -340,13 +361,38 @@ class GroupsAddViewModel @Inject constructor(
         getGroupList(false)
     }
 
-    fun setCategory(category: String) {
-        currentCategory = category
+    fun setFilters(category: String) {
+        when (category) {
+            "Özel" -> {
+                currentPrivacy = "Özel"
+                currentCategory = "Tümü"
+            }
+            "Açık" -> {
+                currentPrivacy = "Açık"
+                currentCategory = "Tümü"
+            }
+            else -> {
+                if (category == "Tümü") {
+                    currentPrivacy = null
+                }
+                currentCategory = category
+            }
+        }
         resetGroupList()
     }
 
     suspend fun requestJoinGroup(groupId: String, userId: String, joinCode: String?) {
         try {
+            val userDoc = db.collection("users").document(userId).get().await()
+            val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
+            val maxAllowedGroups = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+
+            // Sadece katıldığı grupları kontrol et
+            if (joinedGroups.size >= maxAllowedGroups) {
+                _joinGroupState.value = "Maksimum grup limitine ulaştınız (${maxAllowedGroups})"
+                return
+            }
+
             val groupRef = db.collection("groups").document(groupId)
             val group = groupRef.get().await()
             
@@ -388,12 +434,11 @@ class GroupsAddViewModel @Inject constructor(
             }
 
             val groupAdminId = group.getString("createdBy")
-            val userDoc = db.collection("users").document(userId).get().await()
             val userName = userDoc.getString("name") ?: "Misafir"
             val groupName = group.getString("groupName") ?: "Grup"
 
             if (joinCode != null) {
-                if (joinCode == group.getString("joinCode")) {
+                if (joinCode == group.getString("groupCode")) {
                     addUserToGroup(groupId, userId)
                 } else {
                     _joinGroupState.value = "Geçersiz katılım kodu"
@@ -468,21 +513,34 @@ class GroupsAddViewModel @Inject constructor(
     fun getUserGroups() {
         viewModelScope.launch {
             try {
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
+                val userId = auth.currentUser?.uid
                 if (userId != null) {
-                    // Kullanıcının belgesinden joinedGroups listesini al
                     val userDoc = db.collection("users").document(userId).get().await()
                     val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
-                    Log.e("users","joinedGroups : $joinedGroups")
-                    // Her grup ID'si için grup detailer çek
+                    val maxAllowed = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+
                     val groups = joinedGroups.mapNotNull { groupId ->
                         val groupDoc = db.collection("groups").document(groupId).get().await()
                         if (groupDoc.exists()) {
-                            groupDoc.toObject(Group::class.java)
+                            Group(
+                                groupId = groupDoc.getString("groupId") ?: "",
+                                groupName = groupDoc.getString("groupName") ?: "",
+                                category = groupDoc.getString("category") ?: "",
+                                frequency = groupDoc.getString("frequency") ?: "",
+                                isPrivate = groupDoc.getBoolean("isPrivate") ?: false,
+                                participationType = groupDoc.getString("participationType") ?: "",
+                                participantNumber = groupDoc.getLong("participantNumber")?.toInt() ?: 0,
+                                description = groupDoc.getString("description") ?: "",
+                                createdAt = groupDoc.getLong("createdAt") ?: 0,
+                                createdBy = groupDoc.getString("createdBy") ?: "",
+                                habitDuration = groupDoc.getString("habitDuration") ?: "",
+                                quote = groupDoc.getString("quote") ?: "",
+                                members = (groupDoc.get("members") as? List<String>) ?: emptyList()
+                            )
                         } else null
                     }
-                    Log.e("users","groups . $groups")
-                    
+
+                    _maxAllowedGroups.value = maxAllowed
                     _myGroups.value = groups
                 }
             } catch (e: Exception) {
@@ -490,122 +548,7 @@ class GroupsAddViewModel @Inject constructor(
             }
         }
     }
-
-    private fun loadRequests() {
-        viewModelScope.launch {
-            try {
-                val currentUserId = auth.currentUser?.uid
-                if (currentUserId == null) {
-                    _requestsState.value = RequestsUiState.Error("Kullanıcı oturumu bulunamadı")
-                    return@launch
-                }
-
-                val requests = db.collection("groupRequests")
-                    .whereEqualTo("adminId", currentUserId)
-                    .orderBy("timestamp", Query.Direction.DESCENDING)
-                    .get()
-                    .await()
-                    .documents
-                    .mapNotNull { doc ->
-                        try {
-                            GroupRequest(
-                                id = doc.id,
-                                groupId = doc.getString("groupId") ?: return@mapNotNull null,
-                                userId = doc.getString("userId") ?: return@mapNotNull null,
-                                groupName = doc.getString("groupName") ?: return@mapNotNull null,
-                                senderName = doc.getString("userName") ?: "İsimsiz Kullanıcı",
-                                status = doc.getString("status")?.let { RequestStatus.valueOf(it.uppercase()) }
-                                    ?: RequestStatus.PENDING,
-                                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
-                                isRead = doc.getBoolean("isRead") ?: false,
-                                senderImage = null
-                            )
-                        } catch (e: Exception) {
-                            Log.e("GroupsAdd", "Error parsing request: ${e.message}")
-                            null
-                        }
-                    }
-
-                val requestsWithImages = requests.map { request ->
-                    try {
-                        val userDoc = db.collection("users")
-                            .document(request.userId)
-                            .get()
-                            .await()
-                        
-                        request.copy(
-                            senderImage = userDoc.getString("profileImage")
-                        )
-                    } catch (e: Exception) {
-                        request
-                    }
-                }
-
-                val unreadCount = requestsWithImages.count { !it.isRead && it.status == RequestStatus.PENDING }
-                _requestsState.value = RequestsUiState.Success(requestsWithImages, unreadCount)
-                
-            } catch (e: Exception) {
-                _requestsState.value = RequestsUiState.Error("İstekler yüklenirken bir hata oluştu: ${e.message}")
-            }
-        }
-    }
-
-    fun loadAllRequests() {
-        loadRequests()
-    }
-
-    // İstek durumunu güncellemek için yeni fonksiyon
-    fun updateRequestStatus(requestId: String, newStatus: RequestStatus) {
-        viewModelScope.launch {
-            try {
-                db.collection("groupRequests")
-                    .document(requestId)
-                    .update(
-                        mapOf(
-                            "status" to newStatus.name.lowercase(),
-                            "isRead" to true
-                        )
-                    )
-                    .await()
-                
-                // İstekleri yeniden yükle
-                loadRequests()
-            } catch (e: Exception) {
-                Log.e("GroupsAdd", "Error updating request status", e)
-            }
-        }
-    }
-
-    // İsteği okundu olarak işaretle
-    fun markRequestAsRead(requestId: String) {
-        viewModelScope.launch {
-            try {
-                db.collection("groupRequests")
-                    .document(requestId)
-                    .update("isRead", true)
-                    .await()
-                
-                loadRequests()
-            } catch (e: Exception) {
-                Log.e("GroupsAdd", "Error marking request as read", e)
-            }
-        }
-    }
-
-    fun requestJoinGroup(groupId: String) {
-        viewModelScope.launch {
-            try {
-                val currentUser = auth.currentUser
-                if (currentUser == null) {
-                    _joinGroupState.value = "Kullanıcı oturum açmamış"
-                    return@launch
-                }
-                
-                requestJoinGroup(groupId, currentUser.uid, null)
-            } catch (e: Exception) {
-                Log.e("GroupJoin", "Error in requestJoinGroup", e)
-                _joinGroupState.value = "Bir hata oluştu: ${e.message}"
-            }
-        }
-    }
+    
 }
+
+
