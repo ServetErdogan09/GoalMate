@@ -1,5 +1,6 @@
 package com.example.goalmate.prenstatntion.viewProfile
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -103,7 +104,7 @@ fun ViewProfile(
                             groupId = groupId,
                             groupName = groupDoc.getString("groupName") ?: "",
                             category = groupDoc.getString("category") ?: "",
-                            isPrivate = groupDoc.getBoolean("isPrivate") ?: false,
+                            isPrivate = groupDoc.getBoolean("private") ?: false,
                             participationType = groupDoc.getString("participationType") ?: "",
                             frequency = groupDoc.getString("frequency") ?: "",
                             description = groupDoc.getString("description") ?: "",
@@ -111,6 +112,7 @@ fun ViewProfile(
                             members = (groupDoc.get("members") as? List<String>) ?: emptyList()
                         )
                     )
+                    Log.e("isPrivate","isPrivate : ${groupDoc.getBoolean("private")}")
                 }
             }
             userGroups = groupsList
@@ -354,60 +356,7 @@ fun ViewProfile(
     }
 }
 
-@Composable
-fun StatisticBox(
-    icon: Int,
-    value: String,
-    label: String,
-    isHighlighted: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier
-            .height(100.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isHighlighted) 
-                colorResource(id = R.color.yildiz).copy(alpha = 0.2f)
-            else 
-                colorResource(id = R.color.kutubordrengi).copy(alpha = 0.1f)
-        ),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                painter = painterResource(id = icon),
-                contentDescription = null,
-                tint = if (isHighlighted) 
-                    colorResource(id = R.color.yildiz)
-                else 
-                    colorResource(id = R.color.kutubordrengi),
-                modifier = Modifier.size(24.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = value,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = colorResource(id = R.color.yazirengi)
-            )
-            
-            Text(
-                text = label,
-                fontSize = 14.sp,
-                color = colorResource(id = R.color.yazirengiacik)
-            )
-        }
-    }
-}
+
 
 @Composable
 fun TabRow(

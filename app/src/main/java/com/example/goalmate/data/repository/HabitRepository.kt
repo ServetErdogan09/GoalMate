@@ -3,15 +3,24 @@ package com.example.goalmate.data.repository
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.example.goalmate.data.AuthState
 import com.example.goalmate.data.localdata.DaoHabits
 import com.example.goalmate.data.localdata.Habit
+import com.example.goalmate.data.localdata.HabitFirebase
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import java.time.Instant
 import java.time.ZoneId
 
-class HabitRepository @Inject constructor(private val daoHabits: DaoHabits) {
+class HabitRepository @Inject constructor(
+    private val daoHabits: DaoHabits,
+    private val db: FirebaseFirestore,
+    private val auth: FirebaseAuth
+) {
 
     //alışkanlık ekleme
     suspend fun addExercise(habit: Habit): Long {
@@ -26,7 +35,9 @@ class HabitRepository @Inject constructor(private val daoHabits: DaoHabits) {
             lastCompletedDate = null,
             isCompleted = false
         )
-        
+
+        val userId = FirebaseAuth.getInstance().uid
+
         return daoHabits.insert(newHabit)
     }
 
@@ -64,7 +75,47 @@ class HabitRepository @Inject constructor(private val daoHabits: DaoHabits) {
         }
     }
 
+    suspend fun syncWithFirestore() {
+        try {
+            val currentUserId = auth.currentUser?.uid ?: return
+            
+            // Local veritabanındaki alışkanlıkları al
+            val localHabits = getAllExercises().first()
+            
+            // Firestore'daki alışkanlıkları al
+            val firestoreHabits = db.collection("users")
+                .document(currentUserId)
+                .collection("habits")
+                .get()
+                .await()
 
+            // Firestore'daki her alışkanlığı kontrol et
+            for (firestoreDoc in firestoreHabits.documents) {
+                val habitId = firestoreDoc.getLong("habitId")?.toInt() ?: continue
+                val firestoreId = firestoreDoc.id
+
+                // Local veritabanında bu ID'ye sahip alışkanlık var mı kontrol et
+                val existsInLocal = localHabits.any { it.id == habitId }
+
+                if (!existsInLocal) {
+                    // Local'de yoksa Firestore'dan sil
+                    Log.d("HabitSync", "Deleting habit from Firestore. ID: $habitId, FirestoreID: $firestoreId")
+                    db.collection("users")
+                        .document(currentUserId)
+                        .collection("habits")
+                        .document(firestoreId)
+                        .delete()
+                        .await()
+                }
+            }
+
+            Log.d("HabitSync", "Firestore sync completed successfully")
+
+        } catch (e: Exception) {
+            Log.e("HabitSync", "Error during Firestore sync: ${e.message}")
+            throw e
+        }
+    }
 
     suspend fun newUpdateHabit(habit: Habit) {
         try {

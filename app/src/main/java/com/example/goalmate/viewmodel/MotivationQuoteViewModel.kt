@@ -26,17 +26,12 @@ class MotivationQuoteViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    private val _motivationQuote = MutableStateFlow<MotivationQuote?>(null)
-    val motivationQuote: StateFlow<MotivationQuote?> = _motivationQuote.asStateFlow()
 
-    private val _quoteFetchState = MutableStateFlow<QuoteFetchState>(QuoteFetchState.INITIAL)
-    val quoteFetchState: StateFlow<QuoteFetchState> = _quoteFetchState.asStateFlow()
 
 
     private fun getRandomQuoteByCategory(category: String, callback: (MotivationQuote?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                _quoteFetchState.value = QuoteFetchState.LOADING
                 
                 // Firebase'den kategori sözlerini çek
                 val quotesRef = database.getReference("Kategoriler/$category")
@@ -46,7 +41,6 @@ class MotivationQuoteViewModel @Inject constructor(
                 if (!snapshot.exists() || snapshot.childrenCount.toInt() == 0) {
                     Log.e("MotivationQuoteViewModel", "Bu kategoride söz bulunamadı: $category")
                     withContext(Dispatchers.Main) {
-                        _quoteFetchState.value = QuoteFetchState.ERROR
                         callback(null)
                     }
                     return@launch
@@ -75,25 +69,22 @@ class MotivationQuoteViewModel @Inject constructor(
                     }
                     currentIndex++
                 }
+                Log.e("MotivationQuoteViewModel","rastgele ındex :$currentIndex")
                 
                 if (selectedQuote != null) {
                     Log.d("MotivationQuoteViewModel", "Rastgele söz seçildi: ${selectedQuote?.quote}")
                     withContext(Dispatchers.Main) {
-                        _motivationQuote.value = selectedQuote
-                        _quoteFetchState.value = QuoteFetchState.SUCCESS
                         callback(selectedQuote)
                     }
                 } else {
                     Log.e("MotivationQuoteViewModel", "Söz seçiminde hata oluştu")
                     withContext(Dispatchers.Main) {
-                        _quoteFetchState.value = QuoteFetchState.ERROR
                         callback(null)
                     }
                 }
             } catch (e: Exception) {
                 Log.e("MotivationQuoteViewModel", "Söz çekerken hata: ${e.message}", e)
                 withContext(Dispatchers.Main) {
-                    _quoteFetchState.value = QuoteFetchState.ERROR
                     callback(null)
                 }
             }
@@ -104,7 +95,6 @@ class MotivationQuoteViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 withContext(Dispatchers.Main) {
-                    _quoteFetchState.value = QuoteFetchState.LOADING
                 }
 
                 Log.d("MotivationQuoteViewModel", "Kategori için söz aranıyor: $category")
@@ -128,14 +118,13 @@ class MotivationQuoteViewModel @Inject constructor(
                         }
 
                         withContext(Dispatchers.Main) {
-                            _quoteFetchState.value = QuoteFetchState.SUCCESS
+
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.e("MotivationQuoteViewModel", "Grup için söz kaydedilirken hata: ${e.message}", e)
                 withContext(Dispatchers.Main) {
-                    _quoteFetchState.value = QuoteFetchState.ERROR
                 }
             }
         }

@@ -100,6 +100,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.goalmate.data.localdata.GroupRequest
 import com.example.goalmate.extrensions.RequestStatus
 import com.example.goalmate.extrensions.RequestsUiState
+import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -109,7 +110,8 @@ fun HomeScreen(
     starCoinViewModel: StarCoinViewModel = viewModel(),
     completeDayViewModel: CompleteDayViewModel,
     registerViewModel: RegisterViewModel = viewModel(),
-    context: Context
+    context: Context,
+    motivationQuoteViewModel: MotivationQuoteViewModel = viewModel()
 ) {
 
     val uiState by viewModel.uiState.collectAsState()
@@ -122,6 +124,7 @@ fun HomeScreen(
 
     val userName by registerViewModel.userName.collectAsState()
     val profileImage by registerViewModel.profileImage.collectAsState()
+
 
 
     Log.e("userName","profileImage : $profileImage")
@@ -232,7 +235,7 @@ fun HomeScreen(
             if (showExplosion) {
                 PatlayanAnimasyon(
                     modifier = Modifier
-                        .align(Alignment.TopEnd) // Yıldız ikonunun olduğu bölgeye hizala
+                        .align(Alignment.TopEnd)
                 )
             }
 
@@ -890,43 +893,55 @@ fun CustomAlertDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     kalanGun: Int,
-    remainingDays : Long,
+    remainingDays: Long,
     habit: Habit,
     viewModel: HabitViewModel
 ) {
-
     AlertDialog(
         onDismissRequest = { onDismiss() },
         modifier = Modifier
-            .padding(16.dp)
-            .clip(RoundedCornerShape(16.dp)) // Köşeleri yuvarlama
-            .background(color = colorResource(R.color.arkaplan)), // Arka plan rengi
+            .clip(RoundedCornerShape(24.dp))
+            .border(1.dp, colorResource(R.color.kutubordrengi), RoundedCornerShape(24.dp))
+            .background(Color.White),
         title = {
-            Row (
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ){
-
-
-                Icon(
-                    painter = painterResource(R.drawable.baseline_info_24),
-                    contentDescription = "Uyarı",
-                    modifier = Modifier.size(50.dp),
-                    tint = colorResource(R.color.yazirengi)
-                )
-
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.delete),
+                        contentDescription = "Sil",
+                        modifier = Modifier.size(30.dp),
+                        tint = colorResource(R.color.pastelkirmizi)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 Text(
-                    text = "Silme Onayı",
+                    text = "Alışkanlığı Sil",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = colorResource(R.color.kutubordrengi)
+                    color = colorResource(R.color.yazirengi)
                 )
             }
-
         },
         text = {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = if (remainingDays <= 0) {
@@ -939,37 +954,74 @@ fun CustomAlertDialog(
                         }
                     },
                     fontSize = 16.sp,
-                    color = colorResource(R.color.yazirengi),
+                    color = colorResource(R.color.yazirengi).copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                
+                Text(
+                    text = "Bu işlem geri alınamaz",
+                    fontSize = 14.sp,
+                    color = colorResource(R.color.pastelkirmizi),
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(16.dp))
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    val habitHistory = HabitHistory(
-                        habitName = habit.name,
-                        startDate = habit.startDate,
-                        endDate = habit.finishDate,
-                        frequency = habit.frequency,
-                        daysCompleted = habit.completedDays,
-                        habitType = habit.habitType
-                    )
-                    viewModel.deleteHabit(habit)
-                    viewModel.  insertHabitHistory(habitHistory)
-                    onConfirm()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.pastelkirmizi))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Sil", color = Color.White)
+                Button(
+                    onClick = { onDismiss() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "Vazgeç",
+                        color = colorResource(R.color.kutubordrengi),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Button(
+                    onClick = {
+                        val habitHistory = HabitHistory(
+                            habitName = habit.name,
+                            startDate = habit.startDate,
+                            endDate = habit.finishDate,
+                            frequency = habit.frequency,
+                            daysCompleted = habit.completedDays,
+                            habitType = habit.habitType
+                        )
+                        viewModel.deleteHabit(habit)
+                        viewModel.insertHabitHistory(habitHistory)
+                        onConfirm()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.pastelkirmizi)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "Sil",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         },
-        dismissButton = {
-            TextButton(onClick = { onDismiss() }) {
-                Text("İptal", color = Color.Black)
-            }
-        }
+        dismissButton = {}
     )
 }
 

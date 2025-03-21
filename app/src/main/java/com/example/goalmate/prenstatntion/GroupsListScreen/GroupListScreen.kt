@@ -316,17 +316,23 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
             Card(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(8.dp),
-                shape = RoundedCornerShape(50),
+                    .padding(6.dp),
+                shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = getCategoryColor(group.category).copy(alpha = 0.1f)
+                    containerColor = colorResource(R.color.gri).copy(alpha = 0.7f)
+                ),
+                border = BorderStroke(
+                    width = 0.2.dp, 
+                    color = colorResource(R.color.acik_gri)
                 )
             ) {
                 Text(
                     text = group.category,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    color = getCategoryColor(group.category),
-                    style = MaterialTheme.typography.bodyMedium
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    color = colorResource(R.color.kutubordrengi),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Normal
+                    )
                 )
             }
 
@@ -400,7 +406,7 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                         Spacer(modifier = Modifier.width(6.dp))
                         
                         Text(
-                            text = "Grup Lideri",
+                            text = "Yönetici",
                             style = MaterialTheme.typography.bodyMedium,
                             color = colorResource(R.color.yazirengi),
                             fontWeight = FontWeight.Bold
@@ -416,7 +422,10 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                         Card(
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
+                                containerColor = if (group.members.size >= group.participantNumber)
+                                    colorResource(R.color.pastelkirmizi).copy(alpha = 0.2f)
+                                else
+                                    colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
                             )
                         ) {
                             Row(
@@ -425,14 +434,26 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
-                                    painter = painterResource(R.drawable.ic_personal_info),
+                                    painter = if (group.members.size >= group.participantNumber)
+                                        painterResource(R.drawable.close)
+                                    else
+                                        painterResource(R.drawable.ic_personal_info),
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
-                                    tint = colorResource(R.color.kutubordrengi)
+                                    tint = if (group.members.size >= group.participantNumber)
+                                        colorResource(R.color.pastelkirmizi)
+                                    else
+                                        colorResource(R.color.kutubordrengi)
                                 )
                                 Text(
-                                    text = "${group.members.size}/${group.participantNumber}",
-                                    color = colorResource(R.color.kutubordrengi),
+                                    text = if (group.members.size >= group.participantNumber)
+                                        "Dolu (${group.members.size}/${group.participantNumber})"
+                                    else
+                                        "${group.members.size}/${group.participantNumber}",
+                                    color = if (group.members.size >= group.participantNumber)
+                                        colorResource(R.color.pastelkirmizi)
+                                    else
+                                        colorResource(R.color.kutubordrengi),
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }
@@ -482,18 +503,11 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
     }
 }
 
-// Kategori renklerini belirlemek için yardımcı fonksiyon
-@Composable
-private fun getCategoryColor(category: String): Color {
-    return when (category.lowercase()) {
-        "spor" -> Color(0xFF4CAF50)
-        "eğitim" -> Color(0xFF2196F3)
-        "sanat" -> Color(0xFFE91E63)
-        "teknoloji" -> Color(0xFF9C27B0)
-        "seyahat" -> Color(0xFFFF9800)
-        else -> Color(0xFF607D8B)
-    }
-}
+
+
+
+
+
 
 @Composable
 fun EmptyGroupState(selectedTab : Int) {

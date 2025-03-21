@@ -41,7 +41,8 @@ import java.time.format.DateTimeFormatter
 fun AddHabitScreen(
     navController: NavController,
     habitViewModel: HabitViewModel,
-    isGroup: Boolean
+    isGroup: Boolean,
+    habitId: Int? = null
 ) {
     // State değişkenleri
     var name by remember { mutableStateOf("") }
@@ -51,12 +52,54 @@ fun AddHabitScreen(
     var time by remember { mutableStateOf("") }
     var minutes by remember { mutableStateOf("") }
     var selectedIcon by remember { mutableStateOf<Int?>(null) }
-    var selectedColor by remember {mutableStateOf<Int?>(null)}// Seçilen renk
+    var selectedColor by remember {mutableStateOf<Int?>(null)}
     var showIconPicker by remember { mutableStateOf(false) }
-    val habitsCount  = habitViewModel.countActiveHabits.collectAsState().value
+    val habitsCount = habitViewModel.countActiveHabits.collectAsState().value
+
+    // State'leri sıfırla veya mevcut alışkanlığı yükle
+    LaunchedEffect(habitId) {
+        if (habitId != null) {
+            // Düzenleme modu - mevcut alışkanlığı yükle
+            habitViewModel.getHabitById(habitId)
+        } else {
+            // Yeni alışkanlık modu - state'leri sıfırla
+            name = ""
+            frequency = "Günlük"
+            isPrivate = false
+            hours = ""
+            minutes = ""
+            time = ""
+            selectedIcon = null
+            selectedColor = null
+            // ViewModel'deki habit değerini de sıfırla
+            habitViewModel.resetHabit()
+        }
+    }
+    
+    val habit = habitViewModel.habit.collectAsState().value
+    
+    // Eğer düzenleme modundaysa, mevcut alışkanlık bilgilerini yükle
+    LaunchedEffect(habit) {
+        if (habitId != null) {  // Sadece düzenleme modunda değerleri güncelle
+            habit?.let { existingHabit ->
+                name = existingHabit.name
+                frequency = existingHabit.frequency
+                isPrivate = existingHabit.isPrivate
+                selectedIcon = existingHabit.iconResId
+                selectedColor = existingHabit.colorResId
+                
+                // Saat ve dakika ayrıştırma
+                val timeParts = existingHabit.time.split(":")
+                if (timeParts.size == 2) {
+                    hours = timeParts[0]
+                    minutes = timeParts[1]
+                }
+            }
+        }
+    }
+
     Log.e("habitsCount","habitsCount . $habitsCount")
     val textColor = colorResource(R.color.yazirengi)
-
 
     val startDate by habitViewModel.currentTime.collectAsState()
     Log.e("startDateget","startDate : $startDate")
@@ -66,7 +109,6 @@ fun AddHabitScreen(
 
     Log.e("isGroup",isGroup.toString())
     val groupOrNormal = if (isGroup) "group" else "normal"
-
 
     val colorList = listOf(
         R.color.egzersizrengi, R.color.okumarengi, R.color.calismarengi, R.color.suicmerengi, R.color.dogarengi, R.color.meditasyonrengi
@@ -81,18 +123,24 @@ fun AddHabitScreen(
                 .fillMaxSize()
                 .padding(start = 16.dp, end = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(20.dp)) // Yukarıdan biraz boşluk bırakıyoruz
-            // Geri tuşu
-            Icon(
-                painter = painterResource(R.drawable.back),
-                contentDescription = "geri tuşu",
-                modifier = Modifier
-                    .padding(top = 10.dp)
-                    .size(35.dp)
-                    .clickable {
-                        navController.popBackStack()
-                    }
-            )
+            Spacer(modifier = Modifier.height(20.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.back),
+                    contentDescription = "geri tuşu",
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .size(35.dp)
+                        .clickable {
+                            navController.popBackStack()
+                        }
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -212,11 +260,11 @@ fun AddHabitScreen(
                 OutlinedTextField(
                     value = name,
                     onValueChange = {
-                        if (it.length <= 22) {
+                        if (it.length <= 30) {
                             name = it
                         } else {
                             if (toastNumber < 3) {
-                                Toast.makeText(context, "Sadece 20 karakter girebilirsiniz!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Sadece 30 karakter girebilirsiniz!", Toast.LENGTH_SHORT).show()
                                 toastNumber += 1
                             }
                         }
@@ -264,26 +312,32 @@ fun AddHabitScreen(
                             val finishDateLong = finishDate(startDateLong,frequency)
                             Log.d("FinishDate", "Finish Date: ${formatter(finishDateLong)}")
 
-                           time =  formatTime(hours.toInt(),minutes.toInt())
+                            time = formatTime(hours.toInt(),minutes.toInt())
 
-                            val habit = Habit(
+                            val updatedHabit = Habit(
+                                id = habitId ?: 0,
                                 name = name,
                                 frequency = frequency,
                                 isPrivate = isPrivate,
                                 time = time,
                                 startDate = startDateLong,
                                 finishDate = finishDateLong,
-                                lastCompletedDate = System.currentTimeMillis() / (1000 * 60 * 60 * 24),
+                                lastCompletedDate = habit?.lastCompletedDate ?: (System.currentTimeMillis() / (1000 * 60 * 60 * 24)),
                                 iconResId = selectedIcon,
                                 habitType = groupOrNormal,
                                 colorResId = selectedColor,
-                                isExpired = false
+                                isExpired = false,
+                                completedDays = habit?.completedDays ?: 0
                             )
 
-                            habitViewModel.addExercise(habit)
-
-                            if (habitsCount <= 5){
-                                Toast.makeText(context, "$name başarıyla eklendi", Toast.LENGTH_SHORT).show()
+                            if (habitId != null) {
+                                habitViewModel.updateHabit(updatedHabit)
+                                Toast.makeText(context, "Alışkanlık güncellendi", Toast.LENGTH_SHORT).show()
+                            } else {
+                                if (habitsCount <= 5) {
+                                    habitViewModel.addExercise(updatedHabit)
+                                    Toast.makeText(context, "$name başarıyla eklendi", Toast.LENGTH_SHORT).show()
+                                }
                             }
                             navController.popBackStack()
                         } else {
@@ -294,7 +348,7 @@ fun AddHabitScreen(
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.kutubordrengi))
                 ) {
-                    Text("Ekle")
+                    Text(if (habitId != null) "Güncelle" else "Ekle")
                 }
             }
         }

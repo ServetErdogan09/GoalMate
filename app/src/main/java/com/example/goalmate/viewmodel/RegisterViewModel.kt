@@ -830,6 +830,29 @@ class RegisterViewModel @Inject constructor(
         
         return canJoin
     }
+
+    // Kullanıcının grup sayılarını günceller
+    suspend fun updateUserGroupCounts(userId: String) {
+        try {
+            val userDoc = db.collection("users").document(userId).get().await()
+            if (userDoc.exists()) {
+                val joinedGroups = userDoc.get("joinedGroups") as? List<*> ?: emptyList<String>()
+                val maxAllowed = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+                
+                _joinedGroupsCount.value = joinedGroups.size
+                _maxAllowedGroups.value = maxAllowed
+                
+                Log.d("RegisterViewModel", """
+                    Grup Sayıları Güncellendi:
+                    - Kullanıcı ID: $userId
+                    - Mevcut Grup Sayısı: ${joinedGroups.size}
+                    - Maximum İzin: $maxAllowed
+                """.trimIndent())
+            }
+        } catch (e: Exception) {
+            Log.e("RegisterViewModel", "Grup sayıları güncellenirken hata oluştu", e)
+        }
+    }
 }
 
 sealed class VerificationState {

@@ -20,12 +20,14 @@ import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.tasks.await
 import android.util.Log
 import com.example.goalmate.data.AuthState
+import com.google.firebase.firestore.FirebaseFirestore
 
 @Composable
 fun VerificationScreen(
     navController: NavController,
     viewModel: RegisterViewModel = hiltViewModel(),
     auth: FirebaseAuth,
+    db: FirebaseFirestore,
     context: Context
 ) {
     var isVerifying by remember { mutableStateOf(false) }
@@ -42,6 +44,8 @@ fun VerificationScreen(
                     isVerifying = true
                     hasAttemptedSave = true
                     Log.d("VerificationScreen", "Email verified, saving user data...")
+                    
+                    // Kullanıcı verilerini kaydet
                     viewModel.saveUserToFirestore(user.uid, context)
                 }
                 
@@ -57,7 +61,7 @@ fun VerificationScreen(
                     is AuthState.Error -> {
                         Log.e("VerificationScreen", "Error: ${(authState as AuthState.Error).message}")
                         isVerifying = false
-                        hasAttemptedSave = false  // Hata durumunda tekrar denemeye izin ver
+                        hasAttemptedSave = false
                     }
                     else -> {
                         Log.d("VerificationScreen", "Waiting for data save completion...")

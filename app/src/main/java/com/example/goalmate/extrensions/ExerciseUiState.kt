@@ -42,8 +42,19 @@ sealed class RequestsUiState {
 
 
 
+
+
 enum class RequestStatus {
     PENDING,
     ACCEPTED,
     REJECTED
+}
+
+
+// Yeni enum class ekleyelim
+enum class QuoteFetchState {
+    INITIAL,
+    LOADING,
+    SUCCESS,
+    ERROR
 }

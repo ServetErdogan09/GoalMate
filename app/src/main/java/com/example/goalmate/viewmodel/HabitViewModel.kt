@@ -31,6 +31,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.example.goalmate.data.localdata.GroupRequest
+import com.example.goalmate.data.localdata.HabitFirebase
 import com.example.goalmate.extrensions.RequestStatus
 import com.example.goalmate.extrensions.RequestsUiState
 import kotlinx.coroutines.tasks.await
@@ -87,6 +88,8 @@ class HabitViewModel @Inject constructor(
         getCountActiveHabit()
         Log.d("Constants", "MAX_HABIT_COUNT değeri: ${MAX_HABIT_COUNT}")
         loadGroupRequests()
+        // Eski verileri kontrol et
+        checkExistingHabitsForFirestore()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -137,6 +140,8 @@ class HabitViewModel @Inject constructor(
             }
         }
     }
+
+
 
 
     // Alışkanlık tamamlandığında motivasyon mesajı göster
@@ -225,6 +230,54 @@ class HabitViewModel @Inject constructor(
         }
     }
 
+
+
+    private fun addHabitToFirebase(habit: Habit){
+        viewModelScope.launch {
+            try {
+                val currentUserId = auth.currentUser?.uid
+
+                if (currentUserId == null){
+                    Log.e("HabitFirebase", "Kullanıcı oturumu bulunamadı.")
+                    return@launch
+                }
+
+                val habitFirebase = HabitFirebase(
+                    name = habit.name,
+                    iconResId = habit.iconResId,
+                    frequency = habit.frequency,
+                    colorResId = habit.colorResId,
+                    habitId = habit.id
+                )
+
+                Log.e("HabitFirebase","habit ıd : ${habit.id}")
+
+                val habitRef = db.collection("users")
+                    .document(currentUserId)
+                    .collection("habits")
+                    .document()
+
+
+                    habit.firestoreId = habitRef.id
+                    repository.updateHabit(habit)
+
+
+                habitRef.set(habitFirebase)
+                    .addOnSuccessListener {
+                        Log.d("HabitFirebase", "Alışkanlık başarıyla Firestore'a eklendi. ID: ${habitRef.id}")
+
+                    }
+                    .addOnFailureListener {e->
+                        Log.e("HabitFirebase", "Alışkanlık Firestore'a eklenirken hata oluştu", e)
+
+                    }
+
+            }catch (e:Exception){
+                Log.e("HabitFirebase", "Alışkanlık Firebase'e eklenirken hata oluştu: ${e.message}", e)
+            }
+        }
+    }
+
     fun addExercise(habit: Habit) {
         viewModelScope.launch {
             try {
@@ -234,6 +287,10 @@ class HabitViewModel @Inject constructor(
                     Log.e("HabitAdd", "Maksimum limit aşıldı: $activeCount >= $MAX_HABIT_COUNT")
                     _uiState.value = ExerciseUiState.Error("En fazla $MAX_HABIT_COUNT aktif alışkanlık olabilir!")
                     return@launch
+                }
+
+                if (!habit.isPrivate){
+                    addHabitToFirebase(habit)
                 }
 
                 val habitId = repository.addExercise(habit)
@@ -259,9 +316,32 @@ class HabitViewModel @Inject constructor(
     fun deleteHabit(habit: Habit) {
         viewModelScope.launch {
             try {
+                // önce localden sileceğiz
                 repository.deleteExercise(habit)
                 getExercises()
                 getCountActiveHabit()
+
+                if (!habit.isPrivate && habit.firestoreId != null){
+                    val currentUserId = auth.currentUser?.uid
+
+                    if (currentUserId == null) {
+                        Log.e("HabitFirebase", "Kullanıcı oturumu bulunamadı.")
+                        return@launch
+                    }
+
+                    db.collection("users")
+                        .document(currentUserId)
+                        .collection("habits")
+                        .document(habit.firestoreId!!)
+                        .delete()
+                        .addOnSuccessListener {
+                            Log.d("HabitFirebase", "Alışkanlık Firestore'dan başarıyla silindi. ID: ${habit.firestoreId}")
+
+                        }
+                        .addOnFailureListener {e->
+                            Log.e("HabitFirebase", "Alışkanlık Firestore'dan silinirken hata oluştu: ${e.message}", e)
+                        }
+                }
                 Log.d("HabitCount", "Habit deleted, updating count")
             } catch (e: Exception) {
                 Log.e("HabitCount", "Error deleting habit: ${e.message}")
@@ -467,11 +547,11 @@ class HabitViewModel @Inject constructor(
     }
 
 
-    fun  getHabitById(habitId: Int){
+    fun  getHabitById(habitId: Int): StateFlow<Habit?> {
         viewModelScope.launch {
             try {
                 repository.getHabitId(habitId).collect{habit->
-                    _habit.value= habit
+                    _habit.value = habit
                     Log.e("HabitViewModel","habit : $habit")
                 }
 
@@ -479,6 +559,7 @@ class HabitViewModel @Inject constructor(
                 Log.e("HabitViewModel", "Veri çekerken hata verdi: ${e.message}")
             }
         }
+        return habit
     }
 
     fun onCheckboxClickedTrue(){
@@ -822,6 +903,91 @@ class HabitViewModel @Inject constructor(
                 _allRequestsState.value = RequestsUiState.Error("İstekler yüklenirken hata oluştu: ${e.message}")
             }
         }
+    }
+
+    // Mevcut verileri Firestore ile senkronize etmek için kontrol et
+    private fun checkExistingHabitsForFirestore() {
+        viewModelScope.launch {
+            try {
+                when (val currentState = _uiState.value) {
+                    is ExerciseUiState.Success -> {
+                        // Sadece public alışkanlıkları kontrol et
+                        val publicHabits = currentState.habits.filter { !it.isPrivate && it.firestoreId == null }
+                        
+                        if (publicHabits.isNotEmpty()) {
+                            Log.d("HabitFirebase", "Firestore ID'si olmayan ${publicHabits.size} alışkanlık bulundu")
+                            
+                            // Her alışkanlığı Firestore'a ekle
+                            publicHabits.forEach { habit ->
+                                if (!habit.isPrivate) {
+                                    addHabitToFirebase(habit)
+                                }
+                            }
+                        }
+                    }
+                    else -> {
+                        // Önce alışkanlıkları yükle, sonra kontrol et
+                        getExercises()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HabitFirebase", "Mevcut alışkanlıklar kontrol edilirken hata: ${e.message}")
+            }
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun syncFirestoreWithLocalDatabase() {
+        viewModelScope.launch {
+            try {
+                val currentUserId = auth.currentUser?.uid ?: return@launch
+                
+                // Firestore'daki alışkanlıkları al
+                val firestoreHabits = db.collection("users")
+                    .document(currentUserId)
+                    .collection("habits")
+                    .get()
+                    .await()
+
+                // Local veritabanındaki alışkanlıkları al
+                val localHabits = when (val state = _uiState.value) {
+                    is ExerciseUiState.Success -> state.habits
+                    else -> {
+                        getExercises() // Alışkanlıkları yükle
+                        return@launch
+                    }
+                }
+
+                // Firestore'daki her alışkanlığı kontrol et
+                for (firestoreDoc in firestoreHabits.documents) {
+                    val habitId = firestoreDoc.getLong("habitId")?.toInt() ?: continue
+                    val firestoreId = firestoreDoc.id
+
+                    // Local veritabanında bu ID'ye sahip alışkanlık var mı kontrol et
+                    val existsInLocal = localHabits.any { it.id == habitId }
+
+                    if (!existsInLocal) {
+                        // Local'de yoksa Firestore'dan sil
+                        Log.d("HabitSync", "Deleting habit from Firestore. ID: $habitId, FirestoreID: $firestoreId")
+                        db.collection("users")
+                            .document(currentUserId)
+                            .collection("habits")
+                            .document(firestoreId)
+                            .delete()
+                            .await()
+                    }
+                }
+
+                Log.d("HabitSync", "Firestore sync completed successfully")
+
+            } catch (e: Exception) {
+                Log.e("HabitSync", "Error during Firestore sync: ${e.message}")
+            }
+        }
+    }
+
+    fun resetHabit() {
+        _habit.value = null
     }
 }
 

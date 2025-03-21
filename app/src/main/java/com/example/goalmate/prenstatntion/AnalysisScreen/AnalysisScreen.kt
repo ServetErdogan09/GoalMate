@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -123,13 +125,15 @@ fun AnalysisScreen(
         // Header
         HeaderComponent(
             onBackClick = { navController.popBackStack() },
-            onEditClick = {  },
+            onEditClick = { navController.navigate("")  },
             onDeleteClick = {habitViewModel.deleteHabit(habit!!)},
             habit = habit,
             navController,
             completedDayViewModel,
             targetDay = targetDay[habitId]?:0
         )
+
+
 
         // Detay Ekranı
         DetailScreenDesign(
@@ -152,8 +156,8 @@ fun DetailScreenDesign(
     progress: Float,
     showEmoji: Boolean,
     onEmojiClick: () -> Unit,
-    formattedTime: String, // formattedTime parametresi eklendi
-    totalStar : Int,
+    formattedTime: String,
+    totalStar: Int,
     animatedProgress: Animatable<Float, *>
 ) {
     habit?.let {
@@ -161,241 +165,389 @@ fun DetailScreenDesign(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // İlerleme Çemberi
-            ProgressCircleComponent(
-                progress = progress,
-                showEmoji = showEmoji,
-                onEmojiClick = onEmojiClick,
-                animatedProgress = animatedProgress
-            )
-
-            // Alışkanlık Bilgileri
+            // Alışkanlık Başlığı ve Bilgileri
             HabitInfoComponent(
                 habitName = it.name,
                 startDate = it.startDate,
-                finishDate = it.finishDate
+                finishDate = it.finishDate,
+                habit = it
             )
 
-            // Bilgi Kutuları
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                InfoBoxComponent(
-                    iconResId = R.drawable.taget2,
-                    title = "Tamamlandı",
-                    value = "${habit.completedDays} / ${totalHabit(habit.frequency)}",
-                    backgroundColor = colorResource(R.color.suicmerengi)
-                )
-                InfoBoxComponent(
-                    iconResId = R.drawable.baseline_access_time_24,
-                    title = "Bugünkü alışkanlığın bitmesine kalan süre",
-                    value = formattedTime,
-                    backgroundColor = colorResource(R.color.calismarengi)
-                )
-
-                InfoBoxComponent(
-                    iconResId = R.drawable.star,
-                    title = "Alışkanlıktan kazanılan Yıldız",
-                    value = "$totalStar",
-                    backgroundColor = colorResource(R.color.yildiz)
-                )
-
-                InfoBoxComponent(
-                    iconResId = R.drawable.baseline_access_time_24,
-                    title = "Günlük alışkanlık süresi",
-                    value = habit.time,
-                    backgroundColor = colorResource(R.color.dogarengi)
-                )
-
-            }
-
-        }
-    }
-}
-
-
-
-@Composable
-fun InfoBoxComponent(
-    iconResId: Int,
-    title: String,
-    value: String,
-    backgroundColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(70.dp)
-            .border(
-                width = 1.dp,
-                color = colorResource(R.color.yazirengi),
-                shape = RoundedCornerShape(10.dp)
-            )
-            .padding(8.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+            // Ana İstatistik Kartı
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        color = backgroundColor,
-                        shape = CircleShape
-                    )
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(24.dp))
+                    .border(1.dp, colorResource(R.color.kutubordrengi), RoundedCornerShape(24.dp))
+                    .background(Color.White)
+                    .padding(16.dp)
             ) {
-                Icon(
-                    painter = painterResource(iconResId),
-                    contentDescription = "",
-                    modifier = Modifier.size(40.dp)
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // İlerleme Göstergesi
+                    ProgressWaveComponent(
+                        progress = progress,
+                        showEmoji = showEmoji,
+                        onEmojiClick = onEmojiClick,
+                        animatedProgress = animatedProgress
+                    )
+
+                    // Motivasyon Mesajı
+                    Text(
+                        text = when {
+                            progress > 0.75 -> "Harika gidiyorsun! 🌟"
+                            progress > 0.50 -> "Yarıyı geçtin, devam et! 💪"
+                            progress > 0.25 -> "İyi başlangıç! 🌱"
+                            else -> "Haydi başlayalım! 🎯"
+                        },
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.yazirengi),
+                        fontFamily = FontFamily(Font(R.font.kalin_bold))
+                    )
+                }
+            }
+
+            // İstatistik Kartları
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatisticCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Tamamlanan",
+                    value = "${habit.completedDays}/${totalHabit(habit.frequency)}",
+                    icon = R.drawable.taget2,
+                    backgroundColor = colorResource(R.color.suicmerengi)
+                )
+                
+                StatisticCard(
+                    modifier = Modifier.weight(1f),
+                    title = "Kalan Süre",
+                    value = formattedTime,
+                    icon = R.drawable.baseline_access_time_24,
+                    backgroundColor = colorResource(R.color.calismarengi)
                 )
             }
-            Column {
-                Text(
-                    text = value,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily(Font(R.font.noto_regular))
-                )
-                Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    color = colorResource(R.color.yazirengi),
-                    fontFamily = FontFamily(Font(R.font.noto_regular))
-                )
+
+            // Detay Kartı
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(1.dp, colorResource(R.color.kutubordrengi), RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .padding(16.dp)
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    DetailRow(
+                        title = "Sıklık",
+                        value = habit.frequency,
+                        icon = R.drawable.baseline_access_time_24
+                    )
+                    DetailRow(
+                        title = "Tür",
+                        value = habit.habitType,
+                        icon = R.drawable.taget2
+                    )
+                    DetailRow(
+                        title = "Günlük Süre",
+                        value = habit.time,
+                        icon = R.drawable.baseline_access_time_24
+                    )
+                }
             }
         }
     }
 }
 
-
-
-fun showEmoji(progress: Float): Int = when {
-    progress > 0.75 -> R.drawable.veryhappy
-    progress > 0.50 -> R.drawable.happy
-    progress > 0.25 -> R.drawable.sad2
-    else -> R.drawable.sad
-}
-
-
-
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun HabitInfoComponent(
-    habitName: String,
-    startDate: Long,
-    finishDate: Long
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = "Alışkanlık : $habitName",
-            fontSize = 20.sp,
-            color = colorResource(R.color.yazirengi),
-            fontWeight = FontWeight.ExtraBold,
-            fontFamily = FontFamily(Font(R.font.kalin_bold))
-        )
-        Text(
-            text = "Tarih : ${convertMillisToLocalDate(startDate)} - ${convertMillisToLocalDate(finishDate)}",
-            fontSize = 14.sp,
-            color = colorResource(R.color.yazirengi),
-            fontWeight = FontWeight.W500,
-            fontFamily = FontFamily(Font(R.font.noto_regular))
-        )
-    }
-}
-
-
-
-
-
-@Composable
-fun ProgressCircleComponent(
+fun ProgressWaveComponent(
     progress: Float,
     showEmoji: Boolean,
     onEmojiClick: () -> Unit,
     animatedProgress: Animatable<Float, *>
 ) {
-
-    var emoji  by remember { mutableStateOf<Int?>(null)}
-
-
+    var emoji by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(progress) {
         animatedProgress.animateTo(
             targetValue = progress,
             animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing)
         )
-
         emoji = showEmoji(progress)
     }
 
-
     Box(
         modifier = Modifier
-            .size(160.dp)
-            .padding(top = 16.dp),
+            .fillMaxWidth()
+            .height(120.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(colorResource(R.color.arkaplan))
+            .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Arka Plan Dairesi
-        CircularProgressIndicator(
-            progress = { 1f },
-            modifier = Modifier.size(160.dp),
-            color = Color.LightGray,
-            strokeWidth = 12.dp,
-            trackColor = ProgressIndicatorDefaults.circularTrackColor,
-        )
-
-        // Animasyonlu İlerleme Dairesi
-        CircularProgressIndicator(
-            progress = { animatedProgress.value },
-            modifier = Modifier.size(180.dp),
-            color = colorResource(R.color.yeşil),
-            strokeWidth = 12.dp,
-            trackColor = ProgressIndicatorDefaults.circularTrackColor,
-        )
-
-        // Yüzde veya Emoji Gösterimi
-        if (!showEmoji) {
-            Text(
-                text = "${(animatedProgress.value * 100).toInt()}%",
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = colorResource(R.color.yazirengi),
-                modifier = Modifier
-                    .padding(top = 5.dp, start = 5.dp)
-                    .clickable { onEmojiClick() }
-            )
-        } else {
-            if (emoji==null){
-                Image(
-                    painter = painterResource(R.drawable.sad),
-                    contentDescription = "happy",
-                    modifier = Modifier.clickable { onEmojiClick() }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // İlerleme Yüzdesi
+            Column(
+                horizontalAlignment = Alignment.Start
+            ) {
+                Text(
+                    text = "${(animatedProgress.value * 100).toInt()}%",
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colorResource(R.color.yazirengi)
                 )
-            }else{
-                Image(
-                    painter = painterResource(emoji!!),
-                    contentDescription = "happy",
-                    modifier = Modifier
-                        .padding(top = 5.dp, start = 5.dp)
-                        .clickable { onEmojiClick() }
+                Text(
+                    text = "tamamlandı",
+                    fontSize = 14.sp,
+                    color = colorResource(R.color.yazirengi).copy(alpha = 0.7f)
                 )
             }
 
+            // Emoji
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(colorResource(R.color.kutubordrengi).copy(alpha = 0.1f))
+                    .clickable { onEmojiClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (showEmoji) {
+                    Image(
+                        painter = painterResource(emoji ?: R.drawable.sad),
+                        contentDescription = "Mood Emoji",
+                        modifier = Modifier.size(40.dp)
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(R.drawable.taget2),
+                        contentDescription = "",
+                        tint = colorResource(R.color.kutubordrengi),
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+            }
+        }
+
+        // İlerleme Çubuğu
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(colorResource(R.color.yazirengi).copy(alpha = 0.1f))
+                .align(Alignment.BottomCenter)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(animatedProgress.value)
+                    .height(4.dp)
+                    .background(colorResource(R.color.yeşil))
+            )
         }
     }
 }
 
+@Composable
+fun StatisticCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    icon: Int,
+    backgroundColor: Color
+) {
+    Box(
+        modifier = modifier
+            .height(90.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .border(1.dp, backgroundColor, RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .padding(12.dp)
+    ) {
+        Column(
+            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxHeight()
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = "",
+                    modifier = Modifier.size(16.dp),
+                    tint = backgroundColor
+                )
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    color = colorResource(R.color.yazirengi)
+                )
+            }
+            
+            Text(
+                text = value,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = colorResource(R.color.yazirengi)
+            )
+        }
+    }
+}
+
+
+
+@Composable
+fun DetailRow(
+    title: String,
+    value: String,
+    icon: Int
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = "",
+                tint = colorResource(R.color.yazirengi).copy(alpha = 0.7f),
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                color = colorResource(R.color.yazirengi).copy(alpha = 0.7f)
+            )
+        }
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = colorResource(R.color.yazirengi)
+        )
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun HabitInfoComponent(
+    habitName: String,
+    startDate: Long,
+    finishDate: Long,
+    habit: Habit?
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = habitName,
+                fontSize = 24.sp,
+                color = colorResource(R.color.yazirengi),
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily(Font(R.font.kalin_bold))
+            )
+
+            // Zorluk seviyesi rozeti
+            Box(
+                modifier = Modifier
+                    .padding(end = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(getDifficultyColor(habit?.frequency))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(getDifficultyIcon(habit?.frequency)),
+                        contentDescription = "",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = getDifficultyText(habit?.frequency),
+                        fontSize = 12.sp,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.baseline_access_time_24),
+                contentDescription = "",
+                tint = colorResource(R.color.yazirengi).copy(alpha = 0.7f),
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = "${convertMillisToLocalDate(startDate)} - ${convertMillisToLocalDate(finishDate)}",
+                fontSize = 12.sp,
+                color = colorResource(R.color.yazirengi).copy(alpha = 0.7f),
+                fontFamily = FontFamily(Font(R.font.noto_regular))
+            )
+        }
+    }
+}
+
+// Zorluk seviyesi yardımcı fonksiyonları
+@Composable
+private fun getDifficultyColor(frequency: String?): Color {
+    return when (frequency) {
+        "Günlük" -> colorResource(R.color.yesil2)
+        "Haftalık" -> colorResource(R.color.suicmerengi)
+        "Aylık" -> colorResource(R.color.pastelkirmizi)
+        else -> colorResource(R.color.kutubordrengi)
+    }
+}
+
+private fun getDifficultyText(frequency: String?): String {
+    return when (frequency) {
+        "Günlük" -> "Kolay"
+        "Haftalık" -> "Orta"
+        "Aylık" -> "Zor"
+        else -> "Normal"
+    }
+}
+
+private fun getDifficultyIcon(frequency: String?): Int {
+    return when (frequency) {
+        "Günlük" -> R.drawable.taget2  // Zor seviye ikonu
+        "Haftalık" -> R.drawable.taget2 // Orta seviye ikonu
+        "Aylık" -> R.drawable.taget2    // Kolay seviye ikonu
+        else -> R.drawable.taget2       // Varsayılan ikon
+    }
+}
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -436,7 +588,11 @@ fun HeaderComponent(
                 contentDescription = "Düzenle",
                 modifier = Modifier
                     .size(30.dp)
-                    .clickable { onEditClick() }
+                    .clickable {
+                        habit?.let {
+                            navController.navigate("AddHabitScreen?isGroup=${it.habitType == "group"}&habitId=${it.id}")
+                        }
+                    }
             )
             Image(
                 painter = painterResource(R.drawable.delete),
@@ -447,11 +603,7 @@ fun HeaderComponent(
                             showDialog.value = true
                     }
             )
-
-
         }
-
-
     }
 
     if (showDialog.value) {
@@ -467,9 +619,7 @@ fun HeaderComponent(
             habit,
             targetDay = targetDay
         )
-
     }
-
 }
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -515,41 +665,53 @@ fun CustomAlertDialog(
     onBackClick: () -> Unit,
     completedDayViewModel: CompleteDayViewModel,
     habit: Habit?,
-    targetDay:Long
+    targetDay: Long
 ) {
-
     AlertDialog(
         onDismissRequest = { onDismiss() },
         modifier = Modifier
-            .padding(16.dp)
-            .clip(RoundedCornerShape(16.dp)) // Köşeleri yuvarlama
-            .background(color = colorResource(R.color.arkaplan)), // Arka plan rengi
+            .clip(RoundedCornerShape(24.dp))
+            .border(1.dp, colorResource(R.color.kutubordrengi), RoundedCornerShape(24.dp))
+            .background(Color.White),
         title = {
-            Row (
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ){
-
-
-                Icon(
-                    painter = painterResource(R.drawable.baseline_info_24),
-                    contentDescription = "Uyarı",
-                    modifier = Modifier.size(50.dp),
-                    tint = colorResource(R.color.yazirengi)
-                )
-
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(CircleShape)
+                        .background(colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.delete),
+                        contentDescription = "Sil",
+                        modifier = Modifier.size(30.dp),
+                        tint = colorResource(R.color.pastelkirmizi)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 Text(
-                    text = "Silme Onayı",
+                    text = "Alışkanlığı Sil",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = colorResource(R.color.kutubordrengi)
+                    color = colorResource(R.color.yazirengi)
                 )
             }
-
         },
         text = {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = if (targetDay <= 0) {
@@ -562,32 +724,73 @@ fun CustomAlertDialog(
                         }
                     },
                     fontSize = 16.sp,
-                    color = colorResource(R.color.yazirengi),
+                    color = colorResource(R.color.yazirengi).copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                
+                Text(
+                    text = "Bu işlem geri alınamaz",
+                    fontSize = 14.sp,
+                    color = colorResource(R.color.pastelkirmizi),
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(modifier = Modifier.height(16.dp))
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    onConfirm()
-                    completedDayViewModel.deleteHabit(habit!!.id)
-                    onBackClick()
-                          },
-                colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.pastelkirmizi))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Sil", color = Color.White)
+                Button(
+                    onClick = { onDismiss() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "Vazgeç",
+                        color = colorResource(R.color.kutubordrengi),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Button(
+                    onClick = {
+                        onConfirm()
+                        completedDayViewModel.deleteHabit(habit!!.id)
+                        onBackClick()
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.pastelkirmizi)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        "Sil",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         },
-        dismissButton = {
-            Button(
-                onClick = { onDismiss()} ,
-                colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.yesil))
-                ) {
-                Text("İptal", color = Color.White)
-            }
-        }
+        dismissButton = {}
     )
+}
+
+fun showEmoji(progress: Float): Int = when {
+    progress > 0.75 -> R.drawable.veryhappy
+    progress > 0.50 -> R.drawable.happy
+    progress > 0.25 -> R.drawable.sad2
+    else -> R.drawable.sad
 }
 

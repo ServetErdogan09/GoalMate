@@ -42,56 +42,48 @@ fun GroupsAdd(
 ) {
     var groupName by remember { mutableStateOf("") }
     var frequency by remember { mutableStateOf("Günlük") }
-    var participationType by remember { mutableStateOf("Onay") }
     var isPrivate by remember { mutableStateOf(false) }
+    var participationType by remember { mutableStateOf("Herkes") }
     var participantNumber by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Sağlık") }
     var groupDescription by remember { mutableStateOf("") }
     var habitHours by remember { mutableStateOf("") }
     var habitMinutes by remember { mutableStateOf("") }
 
-
-    
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-
-    val textColor = colorResource(R.color.yazirengi)
-
     val context = LocalContext.current
     
     val scrollState = rememberScrollState()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     val groupCreationState by viewModel.groupCreationState.collectAsState()
-
-
     val joinedGroupsCount by registerViewModel.joinedGroupsCount.collectAsState()
     val maxAllowedGroups by registerViewModel.maxAllowedGroups.collectAsState()
 
-
-
+    // Snackbar yönetimi
     LaunchedEffect(groupCreationState) {
-        when(groupCreationState){
-            is GroupCreationState.Success ->{
-                snackbarHostState.showSnackbar(
-                    (groupCreationState as GroupCreationState.Success).message
-                        ?: "$groupName Grup başarıyla oluşturuldu!"
-                )
+        scope.launch {
+            try {
+                when(groupCreationState) {
+                    is GroupCreationState.Success -> {
+                        val message = (groupCreationState as GroupCreationState.Success).message
+                            ?: "$groupName Grup başarıyla oluşturuldu!"
+                        snackbarHostState.showSnackbar(message)
+                    }
+                    is GroupCreationState.Failure -> {
+                        snackbarHostState.showSnackbar(
+                            (groupCreationState as GroupCreationState.Failure).message
+                        )
+                    }
+                    GroupCreationState.NoInternet -> {
+                        snackbarHostState.showSnackbar("İnternet bağlantınızı kontrol edin")
+                    }
+                    GroupCreationState.Loading -> { }
+                }
+            } catch (e: Exception) {
+                Log.e("GroupsAdd", "Snackbar gösterme hatası", e)
             }
-
-            is GroupCreationState.Failure -> {
-                snackbarHostState.showSnackbar(
-                    (groupCreationState as GroupCreationState.Failure).message
-                )
-            }
-            GroupCreationState.Loading -> {
-
-
-            }
-            GroupCreationState.NoInternet -> {
-                snackbarHostState.showSnackbar("İnternet bağlantınızı kontrol edin")
-            }
-
         }
     }
 
@@ -106,7 +98,16 @@ fun GroupsAdd(
                 title = { },
                 navigationIcon = {
                     IconButton(
-                        onClick = { navController.popBackStack() },
+                        onClick = {
+                            scope.launch {
+                                try {
+                                    snackbarHostState.currentSnackbarData?.dismiss()
+                                } catch (e: Exception) {
+                                    Log.e("GroupsAdd", "Snackbar kapatma hatası", e)
+                                }
+                                navController.popBackStack()
+                            }
+                        },
                         modifier = Modifier.graphicsLayer {
                             alpha = 1f - scrollBehavior.state.collapsedFraction
                             translationY = -50f * scrollBehavior.state.collapsedFraction
@@ -126,7 +127,12 @@ fun GroupsAdd(
                 scrollBehavior = scrollBehavior
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { 
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -191,7 +197,7 @@ fun GroupsAdd(
                                 expanded = false
                             },
                             colors = MenuDefaults.itemColors(
-                                textColor = textColor
+                                textColor = colorResource(R.color.yazirengi)
                             )
                         )
                     }
@@ -284,7 +290,7 @@ fun GroupsAdd(
                                 )
                             )
 
-                            Text(":", color = textColor)
+                            Text(":", color = colorResource(R.color.yazirengi))
 
                             OutlinedTextField(
                                 value = habitMinutes,
@@ -324,7 +330,7 @@ fun GroupsAdd(
                             text = "Gizlilik Ayarı",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = textColor
+                            color = colorResource(R.color.yazirengi)
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -335,6 +341,7 @@ fun GroupsAdd(
                                 onClick = {
                                     isPrivate = false
                                     participationType = "Herkes"
+                                    Log.d("GroupsAdd", "Açık grup seçildi: isPrivate = $isPrivate")
                                 },
                                 label = { Text("🌎 Açık Grup") },
                                 colors = FilterChipDefaults.elevatedFilterChipColors(
@@ -347,6 +354,7 @@ fun GroupsAdd(
                                 onClick = {
                                     isPrivate = true
                                     participationType = "Onay"
+                                    Log.d("GroupsAdd", "Özel grup seçildi: isPrivate = $isPrivate")
                                 },
                                 label = { Text("🔒 Özel Grup") },
                                 colors = FilterChipDefaults.elevatedFilterChipColors(
@@ -365,7 +373,7 @@ fun GroupsAdd(
                             text = "Katılım Türü",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = textColor
+                            color = colorResource(R.color.yazirengi)
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -374,7 +382,7 @@ fun GroupsAdd(
                             if (!isPrivate) {
                                 // Herkese açık grup için sadece "Herkes" seçeneği aktif
                                 ElevatedFilterChip(
-                                    selected = participationType == "Herkes",
+                                    selected = true,
                                     onClick = { participationType = "Herkes" },
                                     label = { Text("👥 Herkes") },
                                     colors = FilterChipDefaults.elevatedFilterChipColors(
@@ -465,7 +473,7 @@ fun GroupsAdd(
                         text = "Katılımcı Sayısı",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = textColor
+                        color = colorResource(R.color.yazirengi)
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -517,7 +525,7 @@ fun GroupsAdd(
                         text = "Grup Açıklaması",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = textColor
+                        color = colorResource(R.color.yazirengi)
                     )
                     OutlinedTextField(
                         value = groupDescription,
@@ -604,8 +612,20 @@ fun GroupsAdd(
                                 return@Button
                             }
 
+                            // Grup türü ve katılım türünü belirle
+                            val groupPrivacy = isPrivate // Özel/Açık durumu
+                            val groupParticipationType = if (isPrivate) participationType else "Herkes"
+                            
+                            Log.d("GroupsAdd", "Grup oluşturuluyor:")
+                            Log.d("GroupsAdd", "isPrivate: $groupPrivacy")
+                            Log.d("GroupsAdd", "participationType: $groupParticipationType")
+                            
                             scope.launch {
                                 try {
+                                    Log.d("GroupsAdd", "Grup oluşturma başlıyor:")
+                                    Log.d("GroupsAdd", "isPrivate = $isPrivate")
+                                    Log.d("GroupsAdd", "participationType = $participationType")
+                                    
                                     val groupId = viewModel.createGroup(
                                         groupName = groupName,
                                         category = selectedCategory,
@@ -618,14 +638,24 @@ fun GroupsAdd(
                                         context = context
                                     )
                                     
-                                    // Grup oluşturma başarılı olduğunda motivasyon sözünü kaydet
                                     if (groupId != null) {
-                                        Log.d("GroupsAdd", "Grup başarıyla oluşturuldu, ID: $groupId")
-                                        Log.d("GroupsAdd", "Motivasyon sözü kaydediliyor... Kategori: $selectedCategory")
+                                        Log.d("GroupsAdd", "Grup başarıyla oluşturuldu:")
+                                        Log.d("GroupsAdd", "Grup ID: $groupId")
+                                        Log.d("GroupsAdd", "Grup Türü: ${if (isPrivate) "Özel" else "Açık"}")
+                                        Log.d("GroupsAdd", "Katılım Türü: $participationType")
+                                        
+                                        // Motivasyon sözünü kaydet
                                         motivationQuoteViewModel.saveQuoteForGroup(groupId = groupId, category = selectedCategory)
+                                        
+                                        // Eğer özel grupsa, grup kodu oluştur
+                                        if (isPrivate) {
+                                            registerViewModel.createGroupCode(groupId)
+                                        }
                                     }
                                 } catch (e: Exception) {
-                                    Log.e("GroupsAdd", "Grup oluşturma veya söz kaydetme hatası", e)
+                                    Log.e("GroupsAdd", "Grup oluşturma hatası", e)
+                                    Log.e("GroupsAdd", "isPrivate: $isPrivate")
+                                    Log.e("GroupsAdd", "participationType: $participationType")
                                     snackbarHostState.showSnackbar(
                                         message = "Grup oluşturulurken bir hata oluştu: ${e.message}",
                                         duration = SnackbarDuration.Short

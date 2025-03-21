@@ -25,7 +25,8 @@ data class Habit(
     val habitType: String,  // Alışkanlık türü (Grup/Normal)
     val colorResId: Int? = null,  // Renk kaynağı
     @ColumnInfo(defaultValue = "0")
-    val isExpired: Boolean = false
+    val isExpired: Boolean = false,
+    var firestoreId: String? = null // Firestore belge ID'si
 )
 
 @Entity(tableName = "habit_history")
@@ -92,6 +93,14 @@ data class GroupHabit(
 )
 
 
+data class HabitFirebase(
+    val name: String,
+    val iconResId: Int? = null,  // Simge kaynağı,
+     val frequency: String,  // Sıklık (Günlük, Haftalık, Aylık)
+    val colorResId: Int? = null,  // Renk kaynağı
+    val habitId : Int
+)
+
 @IgnoreExtraProperties
 data class Group(
     val groupId: String = "",
@@ -106,9 +115,10 @@ data class Group(
     val habitDuration: String,
     val createdBy: String = "",
     val quote: String = "",
+    val groupCode : String = "",
     val members: List<String> = emptyList(),
 ) {
-    constructor() : this("", "", "", "", false, "", 0, "", 0, "", "", "", emptyList())
+    constructor() : this("", "", "", "", false, "", 0, "", 0, "", "", "","", emptyList())
 }
 
 

@@ -78,7 +78,11 @@ import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.core.app.NotificationCompat
+import com.example.goalmate.prenstatntion.showGroupChatScreen.ShowGroupChatScreen
+import com.example.goalmate.prenstatntion.viewProfile.ViewProfile
 import com.example.goalmate.service.FirebaseMessagingService
+import com.example.goalmate.viewmodel.MotivationQuoteViewModel
+import com.google.firebase.firestore.FirestoreRegistrar
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -262,8 +266,11 @@ fun ChangingScreen() {
     val starCoinViewModel: StarCoinViewModel = viewModel()
     val completeDayViewModel: CompleteDayViewModel = viewModel()
     val groupsAddViewModel : GroupsAddViewModel = viewModel()
+    val motivationQuoteViewModel : MotivationQuoteViewModel = viewModel()
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
+
 
     // Yeni başlatmayı ekle
     CloudinaryConfig.initCloudinary(context)
@@ -338,7 +345,8 @@ fun ChangingScreen() {
                 currentRoute != "ProfileScreen" &&
                 currentRoute != "register_screen" &&
                 currentRoute != "WelcomeScreen" &&
-                currentRoute != "UserScreen"
+                currentRoute != "UserScreen" &&
+                !currentRoute.startsWith("ViewProfile")
             ) {
                 BottomNavigationBar(navController)
             }
@@ -369,12 +377,14 @@ fun ChangingScreen() {
             }
 
             composable(route = "verification") {
-                VerificationScreen(navController = navController, viewModel = registerViewModel , auth = auth, context = context)
+                VerificationScreen(navController = navController, viewModel = registerViewModel , auth = auth, context = context, db = db)
             }
 
             composable(route = "HomeScreen") {
-                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context)
+                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context, motivationQuoteViewModel = motivationQuoteViewModel)
             }
+
+
 
             composable(route = "UserScreen") {
                 if (auth.currentUser != null) {
@@ -389,17 +399,22 @@ fun ChangingScreen() {
             }
 
             composable(
-                route = "AddHabitScreen?isGroup={isGroup}",
+                route = "AddHabitScreen?isGroup={isGroup}&habitId={habitId}",
                 arguments = listOf(
                     navArgument("isGroup") {
                         type = NavType.BoolType
                         defaultValue = false 
+                    },
+                    navArgument("habitId") {
+                        type = NavType.IntType
+                        defaultValue = -1
                     }
                 )
             ) { backStackEntry ->
                 val isGroup = backStackEntry.arguments?.getBoolean("isGroup") ?: false
+                val habitId = backStackEntry.arguments?.getInt("habitId")?.takeIf { it != -1 }
                 Log.e("isGroup", "Received isGroup: $isGroup")
-                AddHabitScreen(navController = navController, habitViewModel, isGroup)
+                AddHabitScreen(navController = navController, habitViewModel, isGroup, habitId)
             }
 
             composable(route = "GroupAndPrivate") {
@@ -407,12 +422,16 @@ fun ChangingScreen() {
             }
 
             composable(route = "GroupsAdd") {
-                GroupsAdd(navController , viewModel = groupsAddViewModel)
+                GroupsAdd(navController , viewModel = groupsAddViewModel , registerViewModel, motivationQuoteViewModel = motivationQuoteViewModel)
             }
 
 
             composable(route = "GroupListScreen") {
                 GroupListScreen(navController, viewModel = groupsAddViewModel , registerViewModel = registerViewModel)
+            }
+
+            composable(route="ShowGroupChatScreen"){
+                ShowGroupChatScreen(navController = navController)
             }
 
             composable(
@@ -440,11 +459,24 @@ fun ChangingScreen() {
                 )
             ) {backStackEntry->
                 val groupId = backStackEntry.arguments?.getString("groupId")?:""
-                GroupDetailScreen(groupId = groupId,navController , groupsAddViewModel)
+                GroupDetailScreen(groupId = groupId,navController , groupsAddViewModel, motivationQuoteViewModel = motivationQuoteViewModel, registerViewModel = registerViewModel)
+            }
+
+
+            composable(
+                route = "ViewProfile/{userId}",
+                arguments = listOf(
+                    navArgument("userId"){
+                        type = NavType.StringType
+                    }
+                )
+            ) {backStackEntry->
+                val userId = backStackEntry.arguments?.getString("userId")?:""
+                ViewProfile(userId = userId, navController = navController, groupsAddViewModel = groupsAddViewModel)
             }
 
             composable(route = "allRequests") {
-                AllRequestsScreen(habitViewModel,navController)
+                AllRequestsScreen(habitViewModel, registerViewModel = registerViewModel,navController)
             }
 
         }

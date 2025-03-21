@@ -62,18 +62,49 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
+import com.example.goalmate.viewmodel.MotivationQuoteViewModel
+import com.example.goalmate.viewmodel.RegisterViewModel
 
 @Composable
 fun GroupDetailScreen(
     groupId: String,
     navController: NavController,
-    groupsAddViewModel: GroupsAddViewModel
+    groupsAddViewModel: GroupsAddViewModel,
+    motivationQuoteViewModel: MotivationQuoteViewModel,
+    registerViewModel: RegisterViewModel
 ) {
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
     val joinGroupState = groupsAddViewModel.joinGroupState.collectAsState().value
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+
+    // Kullanıcı grup üyesi ise showGroupChatScreen sayfasına yönlendirme yap
+    LaunchedEffect(groupDetailState) {
+        if (groupDetailState is GroupDetailState.Success && currentUserId != null) {
+            if (groupDetailState.group.members.contains(currentUserId)) {
+                navController.navigate("showGroupChatScreen") {
+                    navController.popBackStack()
+                   // popUpTo("GroupDetailScreen/${groupId}") { inclusive = true }
+                }
+                return@LaunchedEffect
+            }
+        }
+    }
+
+
+
+    DisposableEffect(Unit) {
+        onDispose {
+            snackbarHostState.currentSnackbarData?.dismiss() // Sayfadan çıkarken Snackbar'ı kapat
+            Log.e("girdi","girdi")
+        }
+    }
+
+    // Grup detaylarını yükle
+    LaunchedEffect(groupId) {
+        groupsAddViewModel.getGroupById(groupId)
+    }
 
     LaunchedEffect(joinGroupState) {
         joinGroupState?.let { message ->
@@ -82,10 +113,6 @@ fun GroupDetailScreen(
                 groupsAddViewModel.resetJoinGroupState()
             }
         }
-    }
-
-    LaunchedEffect(groupId) {
-        groupsAddViewModel.getGroupById(groupId)
     }
 
     Scaffold(
@@ -168,7 +195,7 @@ fun GroupDetailScreen(
                                 item {
                                     GroupInfoCard(
                                         title = "Motivasyon",
-                                        content = "Teknoloji, insanın sınırlarını zorlayan bir güç, ama unutmamalıyız ki, onu nasıl kullanacağımız, bizim sınırlarımızı belirler.",
+                                        content = group.quote,
                                         icon = R.drawable.book
                                     )
                                 }
@@ -186,7 +213,9 @@ fun GroupDetailScreen(
                                         groupsAddViewModel = groupsAddViewModel,
                                         showOnlyLeader = false,
                                         groupLeaderId = group.createdBy,
-                                        showJoinButton = true
+                                        showJoinButton = true,
+                                        navController = navController,
+                                        registerViewModel =registerViewModel
                                     )
                                 }
                             } else {
@@ -216,7 +245,9 @@ fun GroupDetailScreen(
                                         groupsAddViewModel = groupsAddViewModel,
                                         showOnlyLeader = true,
                                         groupLeaderId = group.createdBy,
-                                        showJoinButton = true
+                                        showJoinButton = true,
+                                        navController = navController,
+                                        registerViewModel = registerViewModel
                                     )
                                 }
                             }
@@ -243,6 +274,14 @@ fun GroupDetailScreen(
 
 @Composable
 fun GroupHeaderSection(group: Group) {
+    // Debug log ekleyelim
+    LaunchedEffect(Unit) {
+        Log.d("GroupDetailScreen", "Group Details:")
+        Log.d("GroupDetailScreen", "isPrivate: ${group.isPrivate}")
+        Log.d("GroupDetailScreen", "participationType: ${group.participationType}")
+        Log.d("GroupDetailScreen", "groupName: ${group.groupName}")
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -264,16 +303,45 @@ fun GroupHeaderSection(group: Group) {
         ) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
+                    containerColor = if (group.isPrivate) 
+                        colorResource(R.color.kirmizi).copy(alpha = 0.1f)
+                    else 
+                        colorResource(R.color.yesil2).copy(alpha = 0.2f)
                 ),
                 shape = RoundedCornerShape(50)
             ) {
-                Text(
-                    text = "${group.participationType} - ${group.category}",
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    color = colorResource(R.color.kutubordrengi),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (group.isPrivate) R.drawable.close
+                            else R.drawable.open
+                        ),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (group.isPrivate) 
+                            colorResource(R.color.pastelkirmizi)
+                        else 
+                            colorResource(R.color.yesil2)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (group.isPrivate) {
+                            Log.d("GroupDetailScreen", "Displaying as Private Group")
+                            "Özel - ${group.category}"
+                        } else {
+                            Log.d("GroupDetailScreen", "Displaying as Open Group")
+                            "Açık - ${group.category}"
+                        },
+                        color = if (group.isPrivate) 
+                            colorResource(R.color.pastelkirmizi)
+                        else 
+                            colorResource(R.color.yesil2),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }
@@ -386,10 +454,12 @@ private fun formatDuration(duration: String): String {
 fun ParticipantsSection(
     members: List<String>,
     groupsAddViewModel: GroupsAddViewModel,
+    registerViewModel: RegisterViewModel,
     showOnlyLeader: Boolean,
     groupLeaderId: String,
     showJoinButton: Boolean,
-    db: FirebaseFirestore = FirebaseFirestore.getInstance()
+    db: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    navController: NavController
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
@@ -430,10 +500,10 @@ fun ParticipantsSection(
             Spacer(modifier = Modifier.height(8.dp))
 
             if (showOnlyLeader) {
-                ParticipantItem(memberId = groupLeaderId, groupsAddViewModel = groupsAddViewModel)
+                ParticipantItem(memberId = groupLeaderId, groupsAddViewModel = groupsAddViewModel, navController = navController)
             } else {
                 members.forEach { memberId ->
-                    ParticipantItem(memberId = memberId, groupsAddViewModel = groupsAddViewModel)
+                    ParticipantItem(memberId = memberId, groupsAddViewModel = groupsAddViewModel, navController = navController )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
@@ -443,7 +513,8 @@ fun ParticipantsSection(
                 Spacer(modifier = Modifier.height(16.dp))
                 JoinGroupButton(
                     db = db,
-                    groupsAddViewModel = groupsAddViewModel
+                    groupsAddViewModel = groupsAddViewModel,
+                    registerViewModel = registerViewModel
                 )
             }
         }
@@ -451,12 +522,15 @@ fun ParticipantsSection(
 }
 
 @Composable
-fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel) {
+fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel, navController: NavController) {
     val userNames = groupsAddViewModel.userNames.collectAsState().value
     val profileImages = groupsAddViewModel.profileImages.collectAsState().value
+    val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
+    val group = (groupDetailState as? GroupDetailState.Success)?.group
     
     val userName = userNames[memberId] ?: "Yükleniyor..."
     val profileImage = profileImages[memberId] ?: ""
+    val isGroupLeader = group?.createdBy == memberId
 
     LaunchedEffect(key1 = memberId) {
         groupsAddViewModel.getUsersName(memberId)
@@ -470,6 +544,10 @@ fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel) {
                 color = colorResource(R.color.beyaz),
                 shape = RoundedCornerShape(12.dp)
             )
+            .clickable {
+                navController.navigate("ViewProfile/${memberId}")
+                Log.e("ViewProfile","kullanıcı ıd : $memberId")
+            }
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -491,80 +569,182 @@ fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel) {
                 .size(40.dp)
                 .clip(CircleShape)
                 .border(1.dp, colorResource(R.color.kutubordrengi), CircleShape)
+                .clickable {
+                    navController.navigate("ViewProfile/${memberId}")
+                    Log.e("ViewProfile","kullanıcı ıd : $memberId")
+                }
         )
         
         Spacer(modifier = Modifier.width(12.dp))
 
-        Text(
-            text = userName,
-            style = MaterialTheme.typography.bodyLarge,
-            color = colorResource(R.color.yazirengi)
-        )
+        Column {
+            if (isGroupLeader){
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colorResource(R.color.yazirengi),
+                    modifier = Modifier.clickable {
+                        navController.navigate("ViewProfile/${memberId}")
+                        Log.e("ViewProfile","kullanıcı ıd : $memberId")
+                    }
+                )
+
+                Text(
+                    text = "Yönetici",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colorResource(R.color.yazirengi),
+                    modifier = Modifier.clickable {
+                        navController.navigate("ViewProfile/${memberId}")
+                        Log.e("ViewProfile","kullanıcı ıd : $memberId")
+                    }
+                )
+            }else{
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = colorResource(R.color.yazirengi),
+                    modifier = Modifier.clickable {
+                        navController.navigate("ViewProfile/${memberId}")
+                        Log.e("ViewProfile","kullanıcı ıd : $memberId")
+                    }
+                )
+            }
+        }
+
+
     }
 }
 
 @Composable
 fun JoinGroupButton(
     db: FirebaseFirestore,
-    groupsAddViewModel: GroupsAddViewModel
+    groupsAddViewModel: GroupsAddViewModel,
+    registerViewModel: RegisterViewModel
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
-    val joinGroupState = groupsAddViewModel.joinGroupState.collectAsState().value
     val scope = rememberCoroutineScope()
+    val joinedGroupsCount = registerViewModel.joinedGroupsCount.collectAsState().value
+    val maxAllowedGroups = registerViewModel.maxAllowedGroups.collectAsState().value
     
     var showJoinDialog by remember { mutableStateOf(false) }
+    var showMaxGroupsDialog by remember { mutableStateOf(false) }
     
     if (currentUserId != null && groupDetailState is GroupDetailState.Success) {
         val group = groupDetailState.group
         val isUserInGroup = group.members.contains(currentUserId)
+        val isGroupFull = group.members.size >= group.participantNumber
+        val hasReachedGroupLimit = joinedGroupsCount >= maxAllowedGroups
+        
+        if (showMaxGroupsDialog) {
+            AlertDialog(
+                onDismissRequest = { showMaxGroupsDialog = false },
+                title = {
+                    Text(
+                        text = "Grup Limiti",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colorResource(id = R.color.yazirengi)
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Maksimum katılabileceğiniz grup sayısına ulaştınız ($maxAllowedGroups). Yeni bir gruba katılmak için önce başka bir gruptan ayrılmalısınız.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(id = R.color.yazirengi)
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showMaxGroupsDialog = false }) {
+                        Text("Tamam")
+                    }
+                }
+            )
+        }
         
         Button(
             onClick = { 
-                if (!isUserInGroup) {
-                    showJoinDialog = true
+                if (!isUserInGroup && !isGroupFull) {
+                    if (hasReachedGroupLimit) {
+                        showMaxGroupsDialog = true
+                    } else {
+                        if (group.isPrivate) {
+                            showJoinDialog = true
+                        } else {
+                            // Açık grup için direkt katılım
+                            scope.launch {
+                                groupsAddViewModel.requestJoinGroup(
+                                    groupId = group.groupId,
+                                    userId = currentUserId,
+                                    joinCode = null,
+                                    participantNumber = group.participantNumber,
+                                    members = group.members
+                                )
+                            }
+                        }
+                    }
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isUserInGroup) 
-                    colorResource(R.color.gri) 
-                else 
-                    colorResource(R.color.kutubordrengi)
+                containerColor = when {
+                    isUserInGroup -> colorResource(R.color.gri)
+                    isGroupFull -> colorResource(R.color.gri)
+                    hasReachedGroupLimit -> colorResource(R.color.pastelkirmizi)
+                    else -> colorResource(R.color.kutubordrengi)
+                }
             ),
             shape = RoundedCornerShape(24.dp),
-            enabled = !isUserInGroup
+            enabled = !isUserInGroup && !isGroupFull
         ) {
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    painter = painterResource(R.drawable.ic_personal_info),
+                    painter = when {
+                        isUserInGroup -> painterResource(R.drawable.ic_personal_info)
+                        isGroupFull -> painterResource(R.drawable.close)
+                        hasReachedGroupLimit -> painterResource(R.drawable.close)
+                        else -> painterResource(R.drawable.ic_personal_info)
+                    },
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = when {
+                        hasReachedGroupLimit -> colorResource(R.color.beyaz)
+                        isGroupFull -> colorResource(R.color.pastelkirmizi)
+                        else -> colorResource(R.color.beyaz)
+                    }
                 )
                 
                 Spacer(modifier = Modifier.width(8.dp))
                 
                 Text(
-                    text = if (isUserInGroup) "Zaten Katıldınız" else "Gruba Katıl",
+                    text = when {
+                        isUserInGroup -> "Zaten Katıldınız"
+                        isGroupFull -> "✨ Grup Şu An Dolu! (${group.members.size}/${group.participantNumber})"
+                        hasReachedGroupLimit -> "Grup Limitine Ulaştınız ($joinedGroupsCount/$maxAllowedGroups)"
+                        else -> if (group.isPrivate) "Gruba Katıl" else "Gruba Katıl"
+                    },
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = when {
+                            isGroupFull -> colorResource(R.color.pastelkirmizi)
+                            else -> colorResource(R.color.beyaz)
+                        }
                     )
                 )
             }
         }
 
-        if (showJoinDialog) {
+        if (showJoinDialog && !isGroupFull && !hasReachedGroupLimit && group.isPrivate) {
             JoinPrivateGroupDialog(
                 group = group,
                 onDismiss = { showJoinDialog = false },
                 onJoinRequest = { code ->
                     scope.launch {
-                        groupsAddViewModel.requestJoinGroup(group.groupId, currentUserId, code)
+                        groupsAddViewModel.requestJoinGroup(group.groupId, currentUserId, code, group.participantNumber, group.members)
                     }
                     showJoinDialog = false
                 }
@@ -671,7 +851,9 @@ private fun SelectableOption(
                 else 
                     Color.Transparent
             )
-            .clickable(onClick = onClick)
+            .clickable(
+                onClick = onClick)
+            
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
