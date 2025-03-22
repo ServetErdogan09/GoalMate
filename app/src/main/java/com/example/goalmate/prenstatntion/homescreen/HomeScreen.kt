@@ -558,42 +558,6 @@ fun HomeScreen(
 
 
 
-@RequiresApi(Build.VERSION_CODES.O)
-fun isCompletionButtonEnabled(lastCompletedDate: Long?, remainingDays: Long): Boolean {
-    if (remainingDays <= 0) {
-        Log.d("ButtonControl", "Alışkanlık süresi dolmuş")
-        return false
-    }
-
-    try {
-        val istanbulZone = ZoneId.of("Europe/Istanbul")
-
-        val today = LocalDate.now(istanbulZone)
-
-        // Daha önce tamamlanmadıysa (lastCompletedDate == null), buton aktif olur
-        if (lastCompletedDate == null) {
-            Log.d("ButtonControl", "Alışkanlık hiç tamamlanmış, tamamlanabilir.")
-            return true
-        }
-
-        val lastDate = Instant.ofEpochMilli(lastCompletedDate)
-            .atZone(istanbulZone)
-            .toLocalDate()
-
-        // Eğer son tamamlanma tarihi bugüne eşitse, tekrar tamamlamaya izin verme
-        if (lastDate.isEqual(today)) {
-            Log.d("ButtonControl", "Bugün zaten tamamlanmış, tekrar tamamlanamaz.")
-            return false
-        }
-
-        Log.d("ButtonControl", "Tamamlamaya izin var.")
-        return true
-    } catch (e: Exception) {
-        Log.e("ButtonControl", "Error: ${e.message}")
-        return false
-    }
-}
-
 
 @OptIn(ExperimentalMaterialApi::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
@@ -630,11 +594,6 @@ fun HabitCard(
     var isDialogOpen by remember { mutableStateOf(false) }
 
 
-    val isButtonEnabled by remember(habit.lastCompletedDate) {
-        derivedStateOf {
-            isCompletionButtonEnabled(habit.lastCompletedDate,remainingDays)
-        }
-    }
 
 
     var isChecked by remember(habit.isCompleted) {
@@ -782,40 +741,25 @@ fun HabitCard(
                             }
                     ) {
                         Checkbox(
-                            checked = habit.lastCompletedDate?.let { lastCompletedDate ->
-                                val today = LocalDate.now(ZoneId.of("Europe/Istanbul"))
-                                val lastDate = Instant.ofEpochMilli(lastCompletedDate)
-                                    .atZone(ZoneId.of("Europe/Istanbul"))
-                                    .toLocalDate()
-
-                                lastDate.isEqual(today)  // Eğer bugün tamamlandıysa checked = true olur
-                            } ?: false,  // Eğer hiç tamamlanmadıysa false olur
+                            checked = habit.isCompleted,
                             onCheckedChange = { checked ->
                                 if (remainingDays <= 0) {
                                     isDialogOpen = true
                                     return@Checkbox
                                 }
 
-                                val canComplete = isCompletionButtonEnabled(habit.lastCompletedDate, remainingDays)
-                                Log.d("Checkbox", "Can complete: $canComplete")
-
-                                if (canComplete) {
-                                    viewModel.addStarAnimation(checkboxPosition)
-                                    viewModel.updateHabitCompletion(habit)  // Alışkanlığı tamamlandı olarak güncelle
+                                if (checked) {
+                                   // viewModel.addStarAnimation(checkboxPosition)
                                     playSound(R.raw.patlama, context)
                                     viewModel.onCheckboxClickedTrue()
-                                    completeDayViewModel.updateCompletedDays(
-                                        habitId = habit.id,
-                                        date = System.currentTimeMillis(), // Güncellenen tarihi kaydet
-                                        completed = true
-                                    )
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        "Bu alışkanlığı bugün zaten tamamladınız. Yarın tekrar deneyebilirsiniz.",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
                                 }
+
+                                viewModel.updateHabitCompletion(habit)
+                                completeDayViewModel.updateCompletedDays(
+                                    habitId = habit.id,
+                                    date = System.currentTimeMillis(),
+                                    completed = checked
+                                )
                             },
                             colors = CheckboxDefaults.colors(
                                 checkedColor = colorResource(R.color.kutubordrengi),
@@ -1052,59 +996,6 @@ fun completionStatus(startMillis: Long, finishMillis: Long, completedDays: Int):
 
 
 
-
-@Composable
-fun AnimatedStar(
-    startPosition: Offset,
-    endPosition: Offset,
-    delayMillis: Long,
-    onAnimationEnd: () -> Unit
-) {
-    var animationProgress by remember { mutableFloatStateOf(0f) }
-
-    // Opaklık animasyonu
-    val alpha by animateFloatAsState(
-        targetValue = 1f - animationProgress,
-        animationSpec = tween(4000, easing = FastOutSlowInEasing), // Başlangıçta yavaş sonra hızlanma
-        label = ""
-    )
-
-    LaunchedEffect(Unit) {
-        delay(delayMillis) // Animasyonlar arasında gecikme
-        animate(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec = tween(3000, easing = FastOutSlowInEasing) // Daha akıcı animasyon
-        ) { value, _ ->
-            animationProgress = value
-        }
-        onAnimationEnd()
-    }
-
-    val currentPosition = lerp(
-        start = startPosition,
-        stop = endPosition,
-        fraction = animationProgress
-    )
-
-    Box(
-        modifier = Modifier
-            .absoluteOffset {
-                IntOffset(
-                    currentPosition.x.roundToInt(),
-                    currentPosition.y.roundToInt()
-                )
-            }
-            .size(30.dp)
-            .graphicsLayer(alpha = alpha) // Yıldızın opaklık değişimi
-    ) {
-        Image(
-            painter = painterResource(R.drawable.starsolid),
-            contentDescription = null,
-            modifier = Modifier.size(30.dp)
-        )
-    }
-}
 
 fun lerp(start: Offset, stop: Offset, fraction: Float): Offset {
     return start + (stop - start) * fraction

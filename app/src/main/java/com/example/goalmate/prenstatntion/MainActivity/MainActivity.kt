@@ -80,7 +80,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import androidx.core.app.NotificationCompat
 import com.example.goalmate.prenstatntion.showGroupChatScreen.ShowGroupChatScreen
 import com.example.goalmate.prenstatntion.viewProfile.ViewProfile
-import com.example.goalmate.service.FirebaseMessagingService
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 import com.google.firebase.firestore.FirestoreRegistrar
 
@@ -91,7 +90,7 @@ class MainActivity : ComponentActivity() {
     ) { isGranted: Boolean ->
         if (isGranted) {
             // bildiirim izin verildiyse tokunu güncele
-            updateFCMToken()
+            //updateFCMToken()
             Log.d("Notification", "Bildirim izni verildi")
         } else {
             // İzin reddedildi kullanıcıyı bilgilendir
@@ -116,11 +115,14 @@ class MainActivity : ComponentActivity() {
                         .update(
                             mapOf(
                                 "fcmToken" to token,
-                                "lastTokenUpdate" to System.currentTimeMillis()
+                                "lastTokenUpdate" to System.currentTimeMillis(),
+                                "notificationEnabled" to true
                             )
                         )
                         .addOnSuccessListener {
                             Log.d("FCM", "Token updated successfully")
+                            // Test bildirimi gönder
+                            sendTestNotification()
                         }
                         .addOnFailureListener { e ->
                             Log.e("FCM", "Token update failed", e)
@@ -130,6 +132,33 @@ class MainActivity : ComponentActivity() {
                 Log.e("FCM", "Failed to get FCM token", task.exception)
             }
         }
+    }
+
+    private fun sendTestNotification() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "group_notifications"
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Grup Bildirimleri",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Grup bildirimleri için kanal"
+                enableLights(true)
+                enableVibration(true)
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val builder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.goal_mate)
+            .setContentTitle("Test Bildirimi")
+            .setContentText("Bildirimler başarıyla ayarlandı!")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+
+        notificationManager.notify(1001, builder.build())
     }
 
     // Bildirim iznini kontrol et
@@ -164,74 +193,38 @@ class MainActivity : ComponentActivity() {
                     }
                     .setNegativeButton("Şimdi Değil") { dialog, _ ->
                         dialog.dismiss()
+                        Toast.makeText(
+                            this,
+                            "Bildirimleri almak için ayarlardan izin vermelisiniz",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                     .show()
             } else {
-                updateFCMToken()
+              //  updateFCMToken()
             }
         } else {
-            updateFCMToken()
+            //updateFCMToken()
         }
     }
 
-
-
-    /*
-    private fun testNotification() {
-        // Manuel bildirim testi
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
-        val notification = NotificationCompat.Builder(this, "group_notifications")
-            .setContentTitle("Test Bildirimi 2222222")
-            .setContentText("Bu bir test bildirimidir")
-            .setSmallIcon(R.drawable.goal_mate)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .build()
-
-        notificationManager.notify(1, notification)
-        Log.d(TAG, "Test notification displayed")
-    }
-
-     */
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Test için FCM service'i başlatalım
-        val fcmService = FirebaseMessagingService()
-       // fcmService.testLogging()
+
         
         // FCM token'ı manuel olarak alalım ve loglayalım
         FirebaseMessaging.getInstance().token
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    Log.e("FCM", "Token: ${task.result}")
+                    Log.d("FCM", "Current Token: ${task.result}")
                 } else {
                     Log.e("FCM", "Token failed", task.exception)
                 }
             }
 
-        // Bildirim izinlerini kontrol et
-        checkNotificationPermission()
+        // Bildirim izinlerini kontrol et ve test bildirimi gönder
+        //askNotificationPermission()
 
-        // Bildirim izni kontrolü
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != 
-                PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    1001
-                )
-            } else {
-                // İzin varsa test bildirimi göster
-               // testNotification()
-            }
-        } else {
-           // testNotification()
-        }
-
-        askNotificationPermission() // İzin kontrolü yap
         enableEdgeToEdge()
         setContent {
             YeniProjeTheme {
@@ -346,6 +339,7 @@ fun ChangingScreen() {
                 currentRoute != "register_screen" &&
                 currentRoute != "WelcomeScreen" &&
                 currentRoute != "UserScreen" &&
+                !currentRoute.startsWith("showGroupChatScreen") &&
                 !currentRoute.startsWith("ViewProfile")
             ) {
                 BottomNavigationBar(navController)
@@ -427,11 +421,19 @@ fun ChangingScreen() {
 
 
             composable(route = "GroupListScreen") {
-                GroupListScreen(navController, viewModel = groupsAddViewModel , registerViewModel = registerViewModel)
+                 GroupListScreen(navController, viewModel = groupsAddViewModel , registerViewModel = registerViewModel)
             }
 
-            composable(route="ShowGroupChatScreen"){
-                ShowGroupChatScreen(navController = navController)
+            composable(
+                route = "showGroupChatScreen/{groupedId}",
+                arguments = listOf(
+                    navArgument("groupedId") {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val groupedId = backStackEntry.arguments?.getString("groupedId") ?: ""
+                ShowGroupChatScreen(navController = navController, groupedId = groupedId, groupsAddViewModel = groupsAddViewModel)
             }
 
             composable(

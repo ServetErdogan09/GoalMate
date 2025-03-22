@@ -20,29 +20,30 @@ object NetworkUtils {
         
         return if (isInternetAvailable(context)) {
             try {
-
                 val serverTime = getServerTime()
                 if (serverTime != null) {
                     // Sunucu zamanı ile yerel zaman arasında büyük fark varsa (manipülasyon)
                     val timeDifference = kotlin.math.abs(serverTime - currentLocalTime)
                     if (timeDifference > 1000 * 60 * 5) { // 5 dakikadan fazla fark varsa
                         // Sunucu zamanını kullan
-                        Log.e("normalizeTime","sunucu zamanı alındı")
-                        normalizeTime(serverTime)
+                        Log.d("MesajTemizleme", "Sunucu zamanı kullanılıyor: $serverTime")
+                        serverTime
                     } else {
                         // Yerel zamanı kullan
-                        normalizeTime(currentLocalTime)
+                        Log.d("MesajTemizleme", "Yerel zaman kullanılıyor: $currentLocalTime")
+                        currentLocalTime
                     }
                 } else {
-                    Log.e("normalizeTime","yerel zamanı alındı")
-                    normalizeTime(currentLocalTime)
+                    Log.d("MesajTemizleme", "Sunucu zamanı alınamadı, yerel zaman kullanılıyor: $currentLocalTime")
+                    currentLocalTime
                 }
             } catch (e: Exception) {
-                Log.e("NetworkUtils", "Server time fetch failed: ${e.message}")
-                normalizeTime(currentLocalTime)
+                Log.e("MesajTemizleme", "Sunucu zamanı alırken hata: ${e.message}")
+                currentLocalTime
             }
         } else {
-            normalizeTime(currentLocalTime)
+            Log.d("MesajTemizleme", "İnternet bağlantısı yok, yerel zaman kullanılıyor: $currentLocalTime")
+            currentLocalTime
         }
     }
 

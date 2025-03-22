@@ -57,264 +57,213 @@ fun GroupAndPrivate(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 16.dp)
                 .background(color = colorResource(R.color.arkaplan))
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 48.dp, bottom = 16.dp)
             ) {
-                // Group Card
-                ElevatedCard(
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = colorResource(R.color.arkaplan)
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(150.dp)
-                        .clickable { 
-                            isGroup = true
-                            navController.navigate("GroupsAdd")
-                        },
-                    elevation = CardDefaults.elevatedCardElevation(4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.group),
-                            contentDescription = "Grup",
-                            modifier = Modifier
-                                .size(64.dp)
-                                .padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Grup Ekle",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colorResource(R.color.yazirengi),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                // Private Habit Card
-                ElevatedCard(
-                    colors = CardDefaults.elevatedCardColors(
-                        containerColor = colorResource(R.color.arkaplan)
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(150.dp)
-                        .clickable { 
-                            isGroup = false
-                            navController.navigate("AddHabitScreen?isGroup=$isGroup")
-                        },
-                    elevation = CardDefaults.elevatedCardElevation(4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.avatar),
-                            contentDescription = "Özel",
-                            modifier = Modifier
-                                .size(64.dp)
-                                .padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Alışkanlık Ekle",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colorResource(R.color.yazirengi),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            // History Section
-            if (habitHistory.isEmpty() && groupHabitHistory.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_personal_info),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(120.dp)
-                            .padding(bottom = 16.dp),
-                        tint = colorResource(R.color.yazirengiacik)
-                    )
-                    Text(
-                        text = "Henüz Geçmiş Alışkanlık Bulunmuyor",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colorResource(R.color.yazirengi),
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Text(
-                        text = "Yeni bir alışkanlık ekleyerek başlayabilirsiniz",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colorResource(R.color.yazirengiacik),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else {
-                // Filter Chips
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "Geçmiş Alışkanlıklar",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colorResource(R.color.yazirengi),
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
+                item {
                     Row(
-                        horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        FilterChip(
-                            selected = showGroupHabits,
-                            onClick = {
-                                showGroupHabits = true
-                                showNormalHabits = false
-                                habitViewModel.getGroupHabitHistory()
-                            },
-                            label = { 
-                                Text(
-                                    "Grup Geçmişi",
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                ) 
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = colorResource(R.color.arkaplan),
-                                selectedContainerColor = colorResource(R.color.kutubordrengi),
-                                labelColor = colorResource(R.color.yazirengi),
-                                selectedLabelColor = colorResource(R.color.beyaz)
+                        // Group Card
+                        ElevatedCard(
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = colorResource(R.color.arkaplan)
                             ),
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-
-                        FilterChip(
-                            selected = showNormalHabits,
-                            onClick = {
-                                showNormalHabits = true
-                                showGroupHabits = false
-                                habitViewModel.getNormalHabitHistory()
-                            },
-                            label = { 
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(150.dp)
+                                .clickable { 
+                                    isGroup = true
+                                    navController.navigate("GroupsAdd")
+                                },
+                            elevation = CardDefaults.elevatedCardElevation(4.dp),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.group),
+                                    contentDescription = "Grup",
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .padding(bottom = 8.dp)
+                                )
                                 Text(
-                                    "Kişisel Geçmiş",
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                ) 
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = colorResource(R.color.arkaplan),
-                                selectedContainerColor = colorResource(R.color.kutubordrengi),
-                                labelColor = colorResource(R.color.yazirengi),
-                                selectedLabelColor = colorResource(R.color.beyaz)
+                                    text = "Grup Ekle",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = colorResource(R.color.yazirengi),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        // Private Habit Card
+                        ElevatedCard(
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = colorResource(R.color.arkaplan)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(150.dp)
+                                .clickable { 
+                                    isGroup = false
+                                    navController.navigate("AddHabitScreen?isGroup=$isGroup")
+                                },
+                            elevation = CardDefaults.elevatedCardElevation(4.dp),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.avatar),
+                                    contentDescription = "Özel",
+                                    modifier = Modifier
+                                        .size(64.dp)
+                                        .padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    text = "Alışkanlık Ekle",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = colorResource(R.color.yazirengi),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // History Section
+                item {
+                    if (!habitHistory.isEmpty() || !groupHabitHistory.isEmpty()) {
+                        // Filter Chips
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 24.dp, bottom = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Geçmiş Alışkanlıklar",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colorResource(R.color.yazirengi),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 12.dp)
                             )
-                        )
+                            
+                            Row(
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                FilterChip(
+                                    selected = showGroupHabits,
+                                    onClick = {
+                                        showGroupHabits = true
+                                        showNormalHabits = false
+                                        habitViewModel.getGroupHabitHistory()
+                                    },
+                                    label = { 
+                                        Text(
+                                            "Grup Geçmişi",
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        ) 
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = colorResource(R.color.arkaplan),
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        labelColor = colorResource(R.color.yazirengi),
+                                        selectedLabelColor = colorResource(R.color.beyaz)
+                                    ),
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+
+                                FilterChip(
+                                    selected = showNormalHabits,
+                                    onClick = {
+                                        showNormalHabits = true
+                                        showGroupHabits = false
+                                        habitViewModel.getNormalHabitHistory()
+                                    },
+                                    label = { 
+                                        Text(
+                                            "Kişisel Geçmiş",
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        ) 
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        containerColor = colorResource(R.color.arkaplan),
+                                        selectedContainerColor = colorResource(R.color.kutubordrengi),
+                                        labelColor = colorResource(R.color.yazirengi),
+                                        selectedLabelColor = colorResource(R.color.beyaz)
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
 
                 // History Content
-                if (showGroupHabits) {
-                    if (groupHabitHistory.isEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.group),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .padding(bottom = 16.dp),
-                                tint = colorResource(R.color.yazirengiacik)
-                            )
-                            Text(
-                                text = "Henüz grup alışkanlık geçmişiniz bulunmuyor",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = colorResource(R.color.yazirengi),
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(groupHabitHistory) { history ->
-                                HabitHistoryItem(habitHistory = history)
-                            }
-                        }
+                if (showGroupHabits && groupHabitHistory.isNotEmpty()) {
+                    items(groupHabitHistory) { history ->
+                        HabitHistoryItem(habitHistory = history)
                     }
                 }
 
-                if (showNormalHabits) {
-                    if (habitHistory.isEmpty()) {
+                if (showNormalHabits && habitHistory.isNotEmpty()) {
+                    items(habitHistory) { history ->
+                        HabitHistoryItem(habitHistory = history)
+                    }
+                }
+
+                // Empty State
+                if (habitHistory.isEmpty() && groupHabitHistory.isEmpty() || 
+                    (showGroupHabits && groupHabitHistory.isEmpty()) || 
+                    (showNormalHabits && habitHistory.isEmpty())) {
+                    item {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(32.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .padding(top = 65.dp , end = 50.dp , bottom = 50.dp , start = 50.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
                         ) {
                             Icon(
-                                painter = painterResource(id = R.drawable.avatar),
+                                painter = painterResource(
+                                    id = if (showGroupHabits) R.drawable.group else R.drawable.avatar
+                                ),
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .size(64.dp)
+                                    .size(120.dp)
                                     .padding(bottom = 16.dp),
                                 tint = colorResource(R.color.yazirengiacik)
                             )
                             Text(
-                                text = "Henüz kişisel alışkanlık geçmişiniz bulunmuyor",
-                                style = MaterialTheme.typography.bodyLarge,
+                                text = if (showGroupHabits) 
+                                    "Henüz grup alışkanlık geçmişiniz bulunmuyor" 
+                                else 
+                                    "Henüz kişisel alışkanlık geçmişiniz bulunmuyor",
+                                style = MaterialTheme.typography.titleMedium,
                                 color = colorResource(R.color.yazirengi),
-                                textAlign = TextAlign.Center,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
                             )
-                        }
-                    } else {
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(habitHistory) { history ->
-                                HabitHistoryItem(habitHistory = history)
-                            }
                         }
                     }
                 }
@@ -329,7 +278,7 @@ fun HabitHistoryItem(habitHistory: HabitHistory) {
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         colors = CardDefaults.elevatedCardColors(
             containerColor = colorResource(R.color.arkaplan)
         ),
@@ -339,7 +288,7 @@ fun HabitHistoryItem(habitHistory: HabitHistory) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {

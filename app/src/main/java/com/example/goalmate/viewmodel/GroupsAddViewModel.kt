@@ -4,10 +4,12 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.goalmate.data.localdata.ChatMessage
 import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.extrensions.GroupCreationState
 import com.example.goalmate.extrensions.GroupDetailState
 import com.example.goalmate.extrensions.GroupListState
+import com.example.goalmate.extrensions.MessagesState
 import com.example.goalmate.utils.NetworkUtils.isNetworkAvailable
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -21,6 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+import com.example.goalmate.utils.NetworkUtils
+import android.os.Build
+import androidx.annotation.RequiresApi
 
 @HiltViewModel
 class GroupsAddViewModel @Inject constructor(
@@ -59,7 +64,15 @@ class GroupsAddViewModel @Inject constructor(
     private val _myGroups = MutableStateFlow<List<Group>>(emptyList())
     val myGroups: StateFlow<List<Group>> = _myGroups.asStateFlow()
 
+    private val _chatMessage = MutableStateFlow<MessagesState>(MessagesState.Loading)
+    val chatMessage : StateFlow<MessagesState> = _chatMessage.asStateFlow()
 
+    // Messages list to store fetched messages
+    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+    val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+
+    // Flag to track if cleanup is already in progress
+    private var isCleanupRunning = false
 
     init {
         getGroupList()
@@ -173,6 +186,155 @@ class GroupsAddViewModel @Inject constructor(
             Log.e("GroupsAdd", "Error creating group", e)
             return null
         }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun createMessagesFirebase(
+        groupId: String,
+        senderId: String,
+        senderName: String,
+        message: String,
+        isCurrentUser: Boolean,
+        context: Context
+    ) {
+        viewModelScope.launch {
+            // Set loading state
+            _chatMessage.value = MessagesState.Loading
+            
+            try {
+                val currentUser = auth.currentUser
+                if (currentUser == null) {
+                    _chatMessage.value = MessagesState.Error("Kullanıcı oturumu bulunamadı")
+                    return@launch
+                }
+                
+                // Clean up old messages (older than 24 hours)
+                cleanupOldMessages(groupId, context)
+                
+                // Generate a unique ID for the message
+                val messageId = db.collection("groups").document(groupId).collection("messages").document().id
+                
+                // Get server time or use device time if server time is unavailable
+                val timestamp = NetworkUtils.getTime(context)
+                
+                // Create message data map
+                val messageMap: HashMap<String, Any> = hashMapOf(
+                    "messageId" to messageId,
+                    "senderId" to senderId,
+                    "senderName" to senderName,
+                    "message" to message,
+                    "timestamp" to timestamp,
+                    "isCurrentUser" to isCurrentUser.toString() // Store as string to match expected format
+                )
+                
+                // Update the state with the new message
+                _chatMessage.value = MessagesState.Success(messageMap)
+                
+                // Save to Firebase
+                db.collection("groups")
+                    .document(groupId)
+                    .collection("messages")
+                    .document(messageId) // Use the generated ID for consistent references
+                    .set(messageMap)
+                    .addOnSuccessListener {
+                        Log.d("GroupsAddViewModel", "Mesaj başarıyla eklendi: $messageId")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("GroupsAddViewModel", "Mesaj gönderme hatası", e)
+                        viewModelScope.launch {
+                            _chatMessage.value = MessagesState.Error("Mesaj gönderilemedi: ${e.localizedMessage}")
+                        }
+                    }
+            } catch (e: Exception) {
+                Log.e("GroupsAddViewModel", "Mesaj oluşturma hatası", e)
+                _chatMessage.value = MessagesState.Error("Beklenmeyen bir hata oluştu: ${e.localizedMessage}")
+            }
+        }
+    }
+    
+    // Function to cleanup messages older than 24 hours
+    @RequiresApi(Build.VERSION_CODES.O)
+    private suspend fun cleanupOldMessages(groupId: String, context: Context) {
+        try {
+            // Get current server time to ensure we don't depend on device time
+            val currentServerTime = NetworkUtils.getTime(context)
+            
+            // Calculate the timestamp for 24 hours ago using server time
+            val twentyFourHoursAgo = currentServerTime - (24 * 60 * 60 * 1000)
+            
+            Log.d("MesajTemizleme", "Şu anki sunucu zamanı: " + formatTimestampForLog(currentServerTime))
+            Log.d("MesajTemizleme", "Şundan eski mesajlar kontrol ediliyor: " + formatTimestampForLog(twentyFourHoursAgo))
+            Log.d("MesajTemizleme", "Temizleme eşiği (24 saat önce): " + formatTimestampForLog(twentyFourHoursAgo))
+            
+            // Query messages older than 24 hours
+            val oldMessagesQuery = db.collection("groups")
+                .document(groupId)
+                .collection("messages")
+                .whereLessThan("timestamp", twentyFourHoursAgo)
+                .limit(100) // Process in batches to avoid overloading
+            
+            val oldMessages = oldMessagesQuery.get().await()
+            
+            if (!oldMessages.isEmpty) {
+                Log.d("MesajTemizleme", "${oldMessages.size()} adet silinecek mesaj bulundu")
+                
+                // Delete each old message
+                for (doc in oldMessages.documents) {
+                    try {
+                        val messageTimestamp = doc.getLong("timestamp") ?: 0
+                        val messageText = doc.getString("message") ?: ""
+                        val senderName = doc.getString("senderName") ?: ""
+                        val messageId = doc.id
+                        
+                        Log.d("MesajTemizleme", "Mesaj siliniyor: \"$messageText\" gönderen: $senderName")
+                        Log.d("MesajTemizleme", "Mesaj zamanı: " + formatTimestampForLog(messageTimestamp))
+                        Log.d("MesajTemizleme", "Mesaj yaşı: ${(currentServerTime - messageTimestamp) / (1000 * 60 * 60)} saat")
+                        
+                        // Ensure we're using await() to complete the delete operation before continuing
+                        db.collection("groups")
+                            .document(groupId)
+                            .collection("messages")
+                            .document(messageId)
+                            .delete()
+                            .await()
+                        
+                        Log.d("MesajTemizleme", "BAŞARILI: Mesaj silindi - ID: $messageId")
+                    } catch (e: Exception) {
+                        Log.e("MesajTemizleme", "Mesaj silinirken hata oluştu: ${e.message}", e)
+                    }
+                }
+                
+                // Double check if deletion worked by trying to get the messages again
+                val checkAfterDelete = db.collection("groups")
+                    .document(groupId)
+                    .collection("messages")
+                    .whereLessThan("timestamp", twentyFourHoursAgo)
+                    .get()
+                    .await()
+                    
+                if (checkAfterDelete.isEmpty) {
+                    Log.d("MesajTemizleme", "Doğrulama: Eski mesajlar başarıyla temizlendi!")
+                } else {
+                    Log.d("MesajTemizleme", "Doğrulama: Hala ${checkAfterDelete.size()} adet eski mesaj var, tekrar deneniyor...")
+                    // If we reached the limit, there might be more messages to delete
+                    if (oldMessages.size() >= 100) {
+                        Log.d("MesajTemizleme", "Limit aşıldı, temizlemeye devam ediliyor...")
+                        cleanupOldMessages(groupId, context) // Recursively delete more messages
+                    }
+                }
+            } else {
+                Log.d("MesajTemizleme", "Grup için silinecek mesaj bulunamadı: $groupId")
+            }
+        } catch (e: Exception) {
+            Log.e("MesajTemizleme", "Eski mesajları temizlerken hata: ${e.message}", e)
+        }
+    }
+
+    // Helper function to format timestamp for logging
+    private fun formatTimestampForLog(timestamp: Long): String {
+        val date = java.util.Date(timestamp)
+        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+        return format.format(date)
     }
 
     fun getGroupById(groupId: String) {
@@ -400,9 +562,7 @@ class GroupsAddViewModel @Inject constructor(
         resetGroupList()
     }
 
-
-
-// Guruba katılma isteğin kontrol edildiği ve gurup kodun kontrol edildiği fonksiyon
+    // Guruba katılma isteğin kontrol edildiği ve gurup kodun kontrol edildiği fonksiyon
     suspend fun requestJoinGroup(
     groupId: String,
     userId: String,
@@ -592,6 +752,178 @@ class GroupsAddViewModel @Inject constructor(
         }
     }
     
+    // Helper function to get current user ID
+    fun getCurrentUserId(): String? {
+        return auth.currentUser?.uid
+    }
+    
+    // Helper function to get current user name - cached or fetch from Firestore
+    fun getCurrentUserName(): String? {
+        val userId = getCurrentUserId() ?: return null
+        // Check if we already have this user's name cached
+        val cachedName = _userNames.value[userId]
+        if (cachedName != null) {
+            return cachedName
+        }
+        
+        // If not cached, try to fetch (will be async, but at least future calls will have it)
+        viewModelScope.launch {
+            try {
+                val document = db.collection("users")
+                    .document(userId)
+                    .get()
+                    .await()
+                
+                if (document.exists()) {
+                    val userName = document.getString("name") ?: "Misafir"
+                    _userNames.value += (userId to userName)
+                }
+            } catch (e: Exception) {
+                Log.e("GroupsAddViewModel", "Error fetching user name", e)
+            }
+        }
+        
+        return "Misafir" // Default fallback name if not immediately available
+    }
+
+    // Listen for group messages in real-time
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun getGroupMessages(groupId: String, context: Context) {
+        viewModelScope.launch {
+            try {
+                // Set initial loading state
+                _chatMessage.value = MessagesState.Loading
+                
+                // Clean up old messages first
+                cleanupOldMessages(groupId, context)
+                
+                // Get current user ID to determine which messages are from the current user
+                val currentUserId = getCurrentUserId()
+                
+                // Create a listener for real-time updates
+                val messagesRef = db.collection("groups")
+                    .document(groupId)
+                    .collection("messages")
+                    .orderBy("timestamp", Query.Direction.ASCENDING)
+                
+                // Use addSnapshotListener for real-time updates
+                messagesRef.addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.e("GroupsAddViewModel", "Error listening for messages", error)
+                        _chatMessage.value = MessagesState.Error("Mesajlar yüklenirken hata oluştu")
+                        return@addSnapshotListener
+                    }
+                    
+                    if (snapshot != null) {
+                        val messagesList = snapshot.documents.mapNotNull { doc ->
+                            try {
+                                val messageId = doc.getString("messageId") ?: ""
+                                val senderId = doc.getString("senderId") ?: ""
+                                val senderName = doc.getString("senderName") ?: ""
+                                val messageText = doc.getString("message") ?: ""
+                                val timestamp = doc.getLong("timestamp") ?: 0L
+                                // Determine if the message is from current user based on sender ID
+                                val isCurrentUser = (senderId == currentUserId)
+                                
+                                // Ensure we load profile image for this user
+                                if (!_profileImages.value.containsKey(senderId)) {
+                                    getProfile(senderId)
+                                }
+                                
+                                // Ensure we have the user name
+                                if (!_userNames.value.containsKey(senderId)) {
+                                    getUsersName(senderId)
+                                }
+                                
+                                ChatMessage(
+                                    messageId = messageId,
+                                    senderId = senderId,
+                                    senderName = senderName,
+                                    message = messageText,
+                                    timestamp = timestamp,
+                                    isCurrentUser = isCurrentUser
+                                )
+                            } catch (e: Exception) {
+                                Log.e("GroupsAddViewModel", "Error parsing message", e)
+                                null
+                            }
+                        }
+                        
+                        _messages.value = messagesList
+                        
+                        // If we have messages, update the success state with the last one
+                        if (messagesList.isNotEmpty()) {
+                            val lastMessage = messagesList.last()
+                            val messageMap = hashMapOf<String, Any>(
+                                "messageId" to lastMessage.messageId,
+                                "senderId" to lastMessage.senderId,
+                                "senderName" to lastMessage.senderName,
+                                "message" to lastMessage.message,
+                                "timestamp" to lastMessage.timestamp,
+                                "isCurrentUser" to lastMessage.isCurrentUser.toString()
+                            )
+                            _chatMessage.value = MessagesState.Success(messageMap)
+                            Log.e("GroupsAddViewModel","GroupsAddViewModel:$messageMap")
+                        } else {
+                            // Empty message list is still a success state
+                            _chatMessage.value = MessagesState.Success(hashMapOf("empty" to true))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("GroupsAddViewModel", "Error in getGroupMessages", e)
+                _chatMessage.value = MessagesState.Error("Mesajlar yüklenirken beklenmeyen bir hata oluştu")
+            }
+        }
+    }
+
+    // Schedule automatic message cleanup for all user's groups
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun scheduleMessageCleanup(context: Context) {
+        // Return early if already cleaning up
+        if (isCleanupRunning) {
+            Log.d("MesajTemizleme", "Temizleme işlemi zaten devam ediyor, yeni işlem atlanıyor")
+            return
+        }
+        
+        isCleanupRunning = true
+        
+        viewModelScope.launch {
+            try {
+                Log.d("MesajTemizleme", "Zamanlanmış mesaj temizleme başlatılıyor...")
+                val currentUserId = auth.currentUser?.uid
+                if (currentUserId == null) {
+                    Log.d("MesajTemizleme", "Giriş yapmış kullanıcı yok, temizleme atlanıyor")
+                    isCleanupRunning = false
+                    return@launch
+                }
+                
+                Log.d("MesajTemizleme", "Kullanıcının katıldığı gruplar alınıyor: $currentUserId")
+                // Get user's joined groups
+                val userDoc = db.collection("users").document(currentUserId).get().await()
+                val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
+                
+                Log.d("MesajTemizleme", "Kullanıcı ${joinedGroups.size} gruba üye, mesajlar temizleniyor...")
+                
+                // Clean up messages in each group
+                for (groupId in joinedGroups) {
+                    try {
+                        Log.d("MesajTemizleme", "$groupId kodlu grup için mesajlar temizleniyor")
+                        cleanupOldMessages(groupId, context)
+                        Log.d("MesajTemizleme", "$groupId kodlu grup için temizlik tamamlandı")
+                    } catch (e: Exception) {
+                        Log.e("MesajTemizleme", "$groupId kodlu grup için mesaj temizleme sırasında hata: ${e.message}", e)
+                    }
+                }
+                
+                Log.d("MesajTemizleme", "Zamanlanmış mesaj temizleme işlemi tüm gruplar için tamamlandı")
+            } catch (e: Exception) {
+                Log.e("MesajTemizleme", "Zamanlanmış mesaj temizleme sırasında hata: ${e.message}", e)
+            } finally {
+                isCleanupRunning = false
+            }
+        }
+    }
 }
 
 

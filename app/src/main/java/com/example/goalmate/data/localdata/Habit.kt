@@ -41,6 +41,17 @@ data class HabitHistory(
 
 )
 
+
+
+data class ChatMessage(
+    val messageId: String,
+    val senderId: String,
+    val senderName: String,
+    val message: String,
+    val timestamp: Long,
+    val isCurrentUser: Boolean
+)
+
 @Entity(
     tableName = "habits_points",
     foreignKeys = [ForeignKey(entity = Habit::class, parentColumns = ["id"], childColumns = ["habitId"], onDelete = ForeignKey.CASCADE)]

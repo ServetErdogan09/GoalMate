@@ -57,8 +57,6 @@ class HabitViewModel @Inject constructor(
     private val _habit = MutableStateFlow<Habit?>(null)
     val  habit : StateFlow<Habit?> = _habit
 
-    private val _starAnimations = mutableStateListOf<Offset>()
-    val starAnimations: List<Offset> get() = _starAnimations
 
     private val _currentTime = MutableStateFlow<Long>(0L)
     val currentTime: StateFlow<Long> get() = _currentTime
@@ -289,13 +287,13 @@ class HabitViewModel @Inject constructor(
                     return@launch
                 }
 
-                if (!habit.isPrivate){
-                    addHabitToFirebase(habit)
-                }
 
                 val habitId = repository.addExercise(habit)
-                habit.id = habitId.toInt()
+                val updatedHabit = habit.copy(id = habitId.toInt()) // alışkanlık ıd sini önce rooma sonra firebase ekleyeceğiz
                 Log.d("HabitAdd", "Yeni alışkanlık başarıyla eklendi. ID: $habitId")
+                if (!habit.isPrivate){
+                    addHabitToFirebase(updatedHabit)
+                }
                 getExercises()
                 getCountActiveHabit()
 
@@ -359,27 +357,21 @@ class HabitViewModel @Inject constructor(
                     .toInstant()
                     .toEpochMilli()
 
-                val lastCompletionDate = habit.lastCompletedDate?.let {
-                    Instant.ofEpochMilli(it)
-                        .atZone(istanbulZone)
-                        .toLocalDate()
+                val updatedHabit = if (habit.isCompleted) {
+                    // Eğer alışkanlık tamamlanmışsa, tamamlanmamış olarak işaretle
+                    habit.copy(
+                        isCompleted = false,
+                        completedDays = habit.completedDays - 1,
+                        lastCompletedDate = null
+                    )
+                } else {
+                    // Eğer alışkanlık tamamlanmamışsa, tamamlandı olarak işaretle
+                    habit.copy(
+                        isCompleted = true,
+                        completedDays = habit.completedDays + 1,
+                        lastCompletedDate = currentTime
+                    )
                 }
-                
-                val currentDate = Instant.ofEpochMilli(currentTime)
-                    .atZone(istanbulZone)
-                    .toLocalDate()
-
-
-                if (lastCompletionDate?.isEqual(currentDate) == true) {
-                    Log.d("HabitCompletion", "Bu alışkanlık bugün zaten tamamlanmış")
-                    return@launch
-                }
-
-                val updatedHabit = habit.copy(
-                    isCompleted = true,
-                    completedDays = habit.completedDays + 1,
-                    lastCompletedDate = currentTime
-                )
 
                 repository.updateHabit(updatedHabit)
                 
@@ -542,9 +534,7 @@ class HabitViewModel @Inject constructor(
         }
     }
 
-    fun addStarAnimation(position: Offset) {
-        _starAnimations.add(position)
-    }
+
 
 
     fun  getHabitById(habitId: Int): StateFlow<Habit?> {
@@ -936,55 +926,7 @@ class HabitViewModel @Inject constructor(
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun syncFirestoreWithLocalDatabase() {
-        viewModelScope.launch {
-            try {
-                val currentUserId = auth.currentUser?.uid ?: return@launch
-                
-                // Firestore'daki alışkanlıkları al
-                val firestoreHabits = db.collection("users")
-                    .document(currentUserId)
-                    .collection("habits")
-                    .get()
-                    .await()
 
-                // Local veritabanındaki alışkanlıkları al
-                val localHabits = when (val state = _uiState.value) {
-                    is ExerciseUiState.Success -> state.habits
-                    else -> {
-                        getExercises() // Alışkanlıkları yükle
-                        return@launch
-                    }
-                }
-
-                // Firestore'daki her alışkanlığı kontrol et
-                for (firestoreDoc in firestoreHabits.documents) {
-                    val habitId = firestoreDoc.getLong("habitId")?.toInt() ?: continue
-                    val firestoreId = firestoreDoc.id
-
-                    // Local veritabanında bu ID'ye sahip alışkanlık var mı kontrol et
-                    val existsInLocal = localHabits.any { it.id == habitId }
-
-                    if (!existsInLocal) {
-                        // Local'de yoksa Firestore'dan sil
-                        Log.d("HabitSync", "Deleting habit from Firestore. ID: $habitId, FirestoreID: $firestoreId")
-                        db.collection("users")
-                            .document(currentUserId)
-                            .collection("habits")
-                            .document(firestoreId)
-                            .delete()
-                            .await()
-                    }
-                }
-
-                Log.d("HabitSync", "Firestore sync completed successfully")
-
-            } catch (e: Exception) {
-                Log.e("HabitSync", "Error during Firestore sync: ${e.message}")
-            }
-        }
-    }
 
     fun resetHabit() {
         _habit.value = null
