@@ -26,6 +26,14 @@ import javax.inject.Inject
 import com.example.goalmate.utils.NetworkUtils
 import android.os.Build
 import androidx.annotation.RequiresApi
+import com.example.goalmate.data.localdata.GroupCloseVoteState
+import com.example.goalmate.data.localdata.GroupHabitStats
+import com.example.goalmate.data.localdata.GroupHabits
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.toObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @HiltViewModel
 class GroupsAddViewModel @Inject constructor(
@@ -33,7 +41,8 @@ class GroupsAddViewModel @Inject constructor(
     private val auth: FirebaseAuth
 ) : ViewModel() {
 
-    private val _groupCreationState = MutableStateFlow<GroupCreationState>(GroupCreationState.Loading)
+    private val _groupCreationState =
+        MutableStateFlow<GroupCreationState>(GroupCreationState.Loading)
     val groupCreationState = _groupCreationState.asStateFlow()
 
     private val _profileImages = MutableStateFlow<Map<String, String>>(emptyMap())
@@ -65,11 +74,22 @@ class GroupsAddViewModel @Inject constructor(
     val myGroups: StateFlow<List<Group>> = _myGroups.asStateFlow()
 
     private val _chatMessage = MutableStateFlow<MessagesState>(MessagesState.Loading)
-    val chatMessage : StateFlow<MessagesState> = _chatMessage.asStateFlow()
+    val chatMessage: StateFlow<MessagesState> = _chatMessage.asStateFlow()
 
     // Messages list to store fetched messages
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
+
+    private val _habitCompletedToday = MutableStateFlow<Map<String,Boolean>>(emptyMap())
+    val habitCompletedToday: StateFlow<Map<String,Boolean>> = _habitCompletedToday.asStateFlow()
+
+    private val _voteToCloseGroup = MutableStateFlow<(Map<String , Boolean>)>(emptyMap())
+    val voteToCloseGroup : StateFlow<Map<String,Boolean>> = _voteToCloseGroup.asStateFlow()
+
+    private val _groupCloseVoteState = MutableStateFlow<Map<String, GroupCloseVoteState>>(emptyMap())
+    val groupCloseVoteState: StateFlow<Map<String, GroupCloseVoteState>> = _groupCloseVoteState.asStateFlow()
+
+
 
     // Flag to track if cleanup is already in progress
     private var isCleanupRunning = false
@@ -78,13 +98,15 @@ class GroupsAddViewModel @Inject constructor(
         getGroupList()
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     suspend fun createGroup(
         groupName: String,
         category: String,
         frequency: String,
         isPrivate: Boolean,
         participationType: String,
-        participantNumber: Int,
+        maxParticipantNumber: Int,
+        startDelay: Int,
         habitDuration: String,
         description: String,
         context: Context
@@ -99,7 +121,8 @@ class GroupsAddViewModel @Inject constructor(
 
             val currentUserId = auth.currentUser?.uid
             if (currentUserId == null) {
-                _groupCreationState.value = GroupCreationState.Failure("Kullanıcı oturumu bulunamadı")
+                _groupCreationState.value =
+                    GroupCreationState.Failure("Kullanıcı oturumu bulunamadı")
                 return null
             }
 
@@ -111,13 +134,21 @@ class GroupsAddViewModel @Inject constructor(
             if (joinedGroups.size >= maxAllowedGroups) {
                 _groupCreationState.value = GroupCreationState.Failure(
                     "Maksimum grup limitine ulaştınız ($maxAllowedGroups). " +
-                    "Daha fazla grup oluşturmak için limit yükseltmeniz gerekiyor."
+                            "Daha fazla grup oluşturmak için limit yükseltmeniz gerekiyor."
                 )
                 return null
             }
 
             val groupId = db.collection("groups").document().id
-            
+            val currentTime = NetworkUtils.getTime(context)
+            // startDeadline = currentTime + (2 * 60 * 1000)
+             val startDeadline = currentTime + (startDelay * 24 * 60 * 60 * 1000L) // günü milisaniyeye çevir
+
+            val minParticipationCount = when{
+                maxParticipantNumber <= 3 -> 2
+                else -> maxParticipantNumber / 2
+            }
+
             // Firestore'a kaydedilecek grup verisi
             val groupData = hashMapOf(
                 "groupId" to groupId,
@@ -126,27 +157,44 @@ class GroupsAddViewModel @Inject constructor(
                 "frequency" to frequency,
                 "private" to isPrivate,
                 "participationType" to participationType,
-                "participantNumber" to participantNumber,
+                "muxParticipationCount" to maxParticipantNumber,
+                "minParticipationCount" to minParticipationCount, // Minimum katılımcı sayısı
+                "groupStartTime" to startDelay.toString(),
                 "description" to description,
-                "createdAt" to System.currentTimeMillis(),
+                "createdAt" to currentTime,
                 "createdBy" to currentUserId,
                 "quote" to "",
                 "groupCode" to "",
                 "habitDuration" to habitDuration,
-                "members" to listOf(currentUserId)
+                "members" to listOf(currentUserId),
+                "groupStatus" to "WAITING",
+                "startDeadline" to startDeadline,
+                "actualStartDate" to null
             )
 
             // Grup oluşturma ve kullanıcı güncelleme işlemlerini transaction içinde yap
             db.runTransaction { transaction ->
                 val userRef = db.collection("users").document(currentUserId)
                 val groupRef = db.collection("groups").document(groupId)
-                
+
+
+
                 // Grup oluştur
                 transaction.set(groupRef, groupData)
-                
+
                 // Kullanıcının katıldığı gruplara ekle
                 transaction.update(userRef, "joinedGroups", joinedGroups + groupId)
+
+                // GroupHabits alt koleksiyonunu oluştur
+                val groupHabitsRef = userRef.collection("groupHabits").document(groupId)
+                transaction.set(groupHabitsRef, GroupHabits(
+                    habitName = groupName,
+                    completedDays = 0,
+                    uncompletedDays = 0
+                )
+                )
             }.await()
+
 
             // UI'ı güncelle
             val newGroup = Group(
@@ -156,20 +204,26 @@ class GroupsAddViewModel @Inject constructor(
                 frequency = frequency,
                 isPrivate = isPrivate,
                 participationType = participationType,
-                participantNumber = participantNumber,
+                muxParticipationCount = maxParticipantNumber,
+                minParticipationCount = maxParticipantNumber / 2,
+                groupStartTime = startDelay.toString(),
                 description = description,
-                createdAt = System.currentTimeMillis(),
+                createdAt = currentTime,
                 createdBy = currentUserId,
                 quote = "",
                 groupCode = "",
                 habitDuration = habitDuration,
-                members = listOf(currentUserId)
+                members = listOf(currentUserId),
+                groupStatus = "WAITING",
+                startDeadline = startDeadline,
+                actualStartDate = null
             )
 
-            val currentGroups = (_groupListState.value as? GroupListState.Success)?.groups ?: emptyList()
+            val currentGroups =
+                (_groupListState.value as? GroupListState.Success)?.groups ?: emptyList()
             val updatedGroups = listOf(newGroup) + currentGroups
             _groupListState.value = GroupListState.Success(updatedGroups)
-            
+
             val currentUserGroups = _myGroups.value
             _myGroups.value = listOf(newGroup) + currentUserGroups
 
@@ -188,6 +242,188 @@ class GroupsAddViewModel @Inject constructor(
         }
     }
 
+
+
+
+
+ // kullanıcı tamamladığını firestore kaydediyoruz duurmu
+    fun markHabitAsCompleted(groupId: String){
+        viewModelScope.launch {
+            try {
+               val currentUserId = auth.currentUser?.uid ?: return@launch
+                val today = System.currentTimeMillis()
+                val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(today))
+
+
+                val completionRef = db.collection("users")
+                    .document(currentUserId)
+                    .collection("habitCompletions")
+                    .document(groupId)
+
+
+                val data = hashMapOf(
+                    "lastCompletedDate" to dateKey,
+                    "timestamp" to today
+                )
+
+               val completedDaysRef = db.collection("users")
+                   .document(currentUserId)
+                   .collection("groupHabits")
+                   .document(groupId)
+
+                completedDaysRef.get().addOnSuccessListener {completed->
+                        if (completed.exists()){
+                            val completedDays = completed.getLong("completedDays")?.toInt() ?:0
+                            Log.d("Firestore", "Tamamlanan gün sayısı: $completedDays")
+                            val newCompletedDays = completedDays +1
+                            completedDaysRef.update("completedDays",newCompletedDays).addOnSuccessListener {
+                                Log.d("Firestore", "Tamamlanan gün sayısı başarıyla güncellendi: $newCompletedDays")
+
+                            }
+                                .addOnFailureListener {e->
+                                    Log.e("Firestore", "Güncelleme başarısız oldu", e)
+                                }
+                        }else{
+                            Log.d("Firestore", "Belge bulunamadı.")
+                        }
+                }
+
+                completionRef.set(data).await()
+                _habitCompletedToday.value += (groupId to true)
+
+            }catch (e:Exception){
+                Log.e("GroupsAddViewModel", "Alışkanlık tamamlandı olarak işaretlenirken bir hata oluştu", e)            }
+        }
+
+    }
+
+
+    // tamamlanıp tammalanmadığını kontrol et
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun checkHabitCompletion(groupId: String , context: Context){
+        viewModelScope.launch {
+            val currentServerTime = NetworkUtils.getTime(context = context )
+            Log.e("currentServerTime","$currentServerTime currentServerTime")
+            try {
+                // İlk olarak false olarak başlat
+                _habitCompletedToday.value += (groupId to false)
+
+                val currentUserId = auth.currentUser?.uid ?: return@launch
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+
+                val completionDoc = db.collection("users")
+                    .document(currentUserId)
+                    .collection("habitCompletions")
+                    .document(groupId)
+                    .get()
+                    .await()
+
+
+                val lastCompletedDate = completionDoc.getString("lastCompletedDate")
+                val isCompletedToday = lastCompletedDate == today
+
+                _habitCompletedToday.value += (groupId to isCompletedToday)
+
+            }catch (e:Exception){
+                Log.e("GroupsAddViewModel", "Alışkanlık tamamlanma durumu kontrol edilirken bir hata oluştu", e)
+                // Hata durumunda da false olarak işaretle
+                _habitCompletedToday.value += (groupId to false)
+            }
+        }
+    }
+
+
+    fun closeGroup(groupId: String) { // yöetici tarafından kapatılabilir grup
+        viewModelScope.launch {
+            db.collection("users").get()
+                .addOnSuccessListener { documents ->
+                    val batch = db.batch() // toplu işlem başlat
+
+                    for (document in documents) {
+                        val userRef = db.collection("users").document(document.id)
+                        // members listesinden bu gurubu çıkar
+                        batch.update(userRef, "members", FieldValue.arrayRemove(groupId))
+                    }
+                    batch.commit().addOnSuccessListener {
+                        db.collection("groups").document(groupId)
+                            .delete()
+                            .addOnSuccessListener {
+                                Log.d("Firestore", "Grup başarıyla silindi: $groupId.")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("Firestore", "Grubu silerken hata oluştu", e)
+                            }
+                    }.addOnFailureListener { e ->
+                        Log.e("Firestore", "Kullanıcıları güncellerken hata oluştu", e)
+
+                    }
+                }.addOnFailureListener { e ->
+                    Log.e("Firestore", "Kullanıcıları çekerken hata oluştu", e)
+
+                }
+        }
+    }
+
+
+
+
+
+    fun leaveGroup(groupId: String) {
+        viewModelScope.launch {
+            try {
+                val currentUser = auth.currentUser ?: return@launch
+                val userRef = db.collection("users").document(currentUser.uid)
+                val groupRef = db.collection("groups").document(groupId)
+
+                db.runTransaction { transaction ->
+                    // Grup bilgilerini al
+                    val groupDoc = transaction.get(groupRef)
+                    val group = groupDoc.toObject<Group>()
+
+                    // Kullanıcı bilgilerini al
+                    val userDoc = transaction.get(userRef)
+                    val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
+
+                    if (group != null) {
+                        // Gruptan kullanıcıyı çıkar
+                        val updatedMembers = group.members.filter { it != currentUser.uid }
+                        transaction.update(groupRef, "members", updatedMembers)
+
+                        // Kullanıcının joinedGroups listesinden grubu çıkar
+                        val updatedJoinedGroups = joinedGroups.filter { it != groupId }
+                        transaction.update(userRef, "joinedGroups", updatedJoinedGroups)
+
+                        Log.d("leaveGroup", "Grup güncelleniyor: $groupId")
+                        Log.d("leaveGroup", "Eski üye listesi: ${group.members}")
+                        Log.d("leaveGroup", "Yeni üye listesi: $updatedMembers")
+                        Log.d("leaveGroup", "Kullanıcı güncelleniyor: ${currentUser.uid}")
+                        Log.d("leaveGroup", "Eski katıldığı gruplar: $joinedGroups")
+                        Log.d("leaveGroup", "Yeni katıldığı gruplar: $updatedJoinedGroups")
+
+                        // Eğer son üye ayrılıyorsa grubu kapat
+                        if (updatedMembers.isEmpty()) {
+                            closeGroup(groupId)
+                        }
+                    }
+                }.addOnSuccessListener {
+                    Log.d("leaveGroup", "Kullanıcı başarıyla gruptan ayrıldı: ${currentUser.uid}")
+                    viewModelScope.launch {
+                        // Grup listelerini güncelle
+                        getUserGroups()
+                        resetGroupList()
+                        // Grup detaylarını güncelle
+                        getGroupById(groupId)
+                    }
+                }.addOnFailureListener { e ->
+                    Log.e("leaveGroup", "Gruptan ayrılma hatası", e)
+                }
+            } catch (e: Exception) {
+                Log.e("leaveGroup", "Gruptan ayrılma işlemi sırasında hata", e)
+            }
+        }
+    }
+
+
     @RequiresApi(Build.VERSION_CODES.O)
     fun createMessagesFirebase(
         groupId: String,
@@ -200,23 +436,24 @@ class GroupsAddViewModel @Inject constructor(
         viewModelScope.launch {
             // Set loading state
             _chatMessage.value = MessagesState.Loading
-            
+
             try {
                 val currentUser = auth.currentUser
                 if (currentUser == null) {
                     _chatMessage.value = MessagesState.Error("Kullanıcı oturumu bulunamadı")
                     return@launch
                 }
-                
+
                 // Clean up old messages (older than 24 hours)
-                cleanupOldMessages(groupId, context)
-                
+                cleanupOldMessages(groupId ,context)
+
                 // Generate a unique ID for the message
-                val messageId = db.collection("groups").document(groupId).collection("messages").document().id
-                
+                val messageId =
+                    db.collection("groups").document(groupId).collection("messages").document().id
+
                 // Get server time or use device time if server time is unavailable
-                val timestamp = NetworkUtils.getTime(context)
-                
+                val timestamp = NetworkUtils.getTime(context = context )
+
                 // Create message data map
                 val messageMap: HashMap<String, Any> = hashMapOf(
                     "messageId" to messageId,
@@ -226,10 +463,10 @@ class GroupsAddViewModel @Inject constructor(
                     "timestamp" to timestamp,
                     "isCurrentUser" to isCurrentUser.toString() // Store as string to match expected format
                 )
-                
+
                 // Update the state with the new message
                 _chatMessage.value = MessagesState.Success(messageMap)
-                
+
                 // Save to Firebase
                 db.collection("groups")
                     .document(groupId)
@@ -242,42 +479,53 @@ class GroupsAddViewModel @Inject constructor(
                     .addOnFailureListener { e ->
                         Log.e("GroupsAddViewModel", "Mesaj gönderme hatası", e)
                         viewModelScope.launch {
-                            _chatMessage.value = MessagesState.Error("Mesaj gönderilemedi: ${e.localizedMessage}")
+                            _chatMessage.value =
+                                MessagesState.Error("Mesajınız gönderilemedi. Lütfen internet bağlantınızı kontrol edip tekrar deneyin: ${e.localizedMessage}")
                         }
                     }
             } catch (e: Exception) {
                 Log.e("GroupsAddViewModel", "Mesaj oluşturma hatası", e)
-                _chatMessage.value = MessagesState.Error("Beklenmeyen bir hata oluştu: ${e.localizedMessage}")
+                _chatMessage.value =
+                    MessagesState.Error("Beklenmeyen bir hata oluştu: ${e.localizedMessage}")
             }
         }
     }
-    
+
     // Function to cleanup messages older than 24 hours
     @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun cleanupOldMessages(groupId: String, context: Context) {
+    private suspend fun cleanupOldMessages(groupId: String , context: Context) {
         try {
             // Get current server time to ensure we don't depend on device time
-            val currentServerTime = NetworkUtils.getTime(context)
-            
+            val currentServerTime = NetworkUtils.getTime(context = context)
+
             // Calculate the timestamp for 24 hours ago using server time
             val twentyFourHoursAgo = currentServerTime - (24 * 60 * 60 * 1000)
-            
-            Log.d("MesajTemizleme", "Şu anki sunucu zamanı: " + formatTimestampForLog(currentServerTime))
-            Log.d("MesajTemizleme", "Şundan eski mesajlar kontrol ediliyor: " + formatTimestampForLog(twentyFourHoursAgo))
-            Log.d("MesajTemizleme", "Temizleme eşiği (24 saat önce): " + formatTimestampForLog(twentyFourHoursAgo))
-            
+
+            Log.d(
+                "MesajTemizleme",
+                "Şu anki sunucu zamanı: " + formatTimestampForLog(currentServerTime)
+            )
+            Log.d(
+                "MesajTemizleme",
+                "Şundan eski mesajlar kontrol ediliyor: " + formatTimestampForLog(twentyFourHoursAgo)
+            )
+            Log.d(
+                "MesajTemizleme",
+                "Temizleme eşiği (24 saat önce): " + formatTimestampForLog(twentyFourHoursAgo)
+            )
+
             // Query messages older than 24 hours
             val oldMessagesQuery = db.collection("groups")
                 .document(groupId)
                 .collection("messages")
                 .whereLessThan("timestamp", twentyFourHoursAgo)
                 .limit(100) // Process in batches to avoid overloading
-            
+
             val oldMessages = oldMessagesQuery.get().await()
-            
+
             if (!oldMessages.isEmpty) {
                 Log.d("MesajTemizleme", "${oldMessages.size()} adet silinecek mesaj bulundu")
-                
+
                 // Delete each old message
                 for (doc in oldMessages.documents) {
                     try {
@@ -285,11 +533,20 @@ class GroupsAddViewModel @Inject constructor(
                         val messageText = doc.getString("message") ?: ""
                         val senderName = doc.getString("senderName") ?: ""
                         val messageId = doc.id
-                        
-                        Log.d("MesajTemizleme", "Mesaj siliniyor: \"$messageText\" gönderen: $senderName")
-                        Log.d("MesajTemizleme", "Mesaj zamanı: " + formatTimestampForLog(messageTimestamp))
-                        Log.d("MesajTemizleme", "Mesaj yaşı: ${(currentServerTime - messageTimestamp) / (1000 * 60 * 60)} saat")
-                        
+
+                        Log.d(
+                            "MesajTemizleme",
+                            "Mesaj siliniyor: \"$messageText\" gönderen: $senderName"
+                        )
+                        Log.d(
+                            "MesajTemizleme",
+                            "Mesaj zamanı: " + formatTimestampForLog(messageTimestamp)
+                        )
+                        Log.d(
+                            "MesajTemizleme",
+                            "Mesaj yaşı: ${(currentServerTime - messageTimestamp) / (1000 * 60 * 60)} saat"
+                        )
+
                         // Ensure we're using await() to complete the delete operation before continuing
                         db.collection("groups")
                             .document(groupId)
@@ -297,13 +554,13 @@ class GroupsAddViewModel @Inject constructor(
                             .document(messageId)
                             .delete()
                             .await()
-                        
+
                         Log.d("MesajTemizleme", "BAŞARILI: Mesaj silindi - ID: $messageId")
                     } catch (e: Exception) {
                         Log.e("MesajTemizleme", "Mesaj silinirken hata oluştu: ${e.message}", e)
                     }
                 }
-                
+
                 // Double check if deletion worked by trying to get the messages again
                 val checkAfterDelete = db.collection("groups")
                     .document(groupId)
@@ -311,15 +568,18 @@ class GroupsAddViewModel @Inject constructor(
                     .whereLessThan("timestamp", twentyFourHoursAgo)
                     .get()
                     .await()
-                    
+
                 if (checkAfterDelete.isEmpty) {
                     Log.d("MesajTemizleme", "Doğrulama: Eski mesajlar başarıyla temizlendi!")
                 } else {
-                    Log.d("MesajTemizleme", "Doğrulama: Hala ${checkAfterDelete.size()} adet eski mesaj var, tekrar deneniyor...")
+                    Log.d(
+                        "MesajTemizleme",
+                        "Doğrulama: Hala ${checkAfterDelete.size()} adet eski mesaj var, tekrar deneniyor..."
+                    )
                     // If we reached the limit, there might be more messages to delete
                     if (oldMessages.size() >= 100) {
                         Log.d("MesajTemizleme", "Limit aşıldı, temizlemeye devam ediliyor...")
-                        cleanupOldMessages(groupId, context) // Recursively delete more messages
+                        cleanupOldMessages(groupId,context) // Recursively delete more messages
                     }
                 }
             } else {
@@ -333,52 +593,46 @@ class GroupsAddViewModel @Inject constructor(
     // Helper function to format timestamp for logging
     private fun formatTimestampForLog(timestamp: Long): String {
         val date = java.util.Date(timestamp)
-        val format = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+        val format =
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
         return format.format(date)
     }
 
     fun getGroupById(groupId: String) {
-        _groupDetailState.value = GroupDetailState.Loading
         viewModelScope.launch {
             try {
-                Log.d("GroupsAddViewModel", "Fetching group details for ID: $groupId")
-                val groupDocument = db.collection("groups").document(groupId).get().await()
-                
-                if (groupDocument.exists()) {
-                    // Debug için ham veriyi logla
-                    Log.d("GroupsAddViewModel", "Raw group data: ${groupDocument.data}")
-                    Log.d("GroupsAddViewModel", "private value: ${groupDocument.getBoolean("private")}")
-                    
-                    val group = Group(
-                        groupId = groupDocument.getString("groupId") ?: "",
-                        groupName = groupDocument.getString("groupName") ?: "",
-                        category = groupDocument.getString("category") ?: "",
-                        frequency = groupDocument.getString("frequency") ?: "",
-                        isPrivate = groupDocument.getBoolean("private") ?: false,
-                        participationType = groupDocument.getString("participationType") ?: "",
-                        participantNumber = groupDocument.getLong("participantNumber")?.toInt() ?: 0,
-                        description = groupDocument.getString("description") ?: "",
-                        createdAt = groupDocument.getLong("createdAt") ?: 0,
-                        createdBy = groupDocument.getString("createdBy") ?: "",
-                        habitDuration = groupDocument.getString("habitDuration") ?: "",
-                        quote = groupDocument.getString("quote") ?: "",
-                        groupCode = groupDocument.getString("groupCode") ?: "",
-                        members = (groupDocument.get("members") as? List<String>) ?: emptyList()
+                val groupDoc = db.collection("groups").document(groupId).get().await()
+                if (groupDoc.exists()) {
+                    val group = groupDoc.toObject<Group>()?.copy(
+                        groupId = groupDoc.id,
+                        groupName = groupDoc.getString("groupName") ?: "",
+                        category = groupDoc.getString("category") ?: "",
+                        frequency = groupDoc.getString("frequency") ?: "",
+                        isPrivate = groupDoc.getBoolean("private") ?: false,
+                        participationType = groupDoc.getString("participationType") ?: "",
+                        muxParticipationCount = groupDoc.getLong("muxParticipationCount")
+                            ?.toInt() ?: 15,
+                        minParticipationCount = groupDoc.getLong("minParticipationCount")
+                            ?.toInt() ?: 7,
+                        groupStartTime = groupDoc.getString("groupStartTime") ?: "1",
+                        description = groupDoc.getString("description") ?: "",
+                        createdAt = groupDoc.getLong("createdAt") ?: 0,
+                        habitDuration = groupDoc.getString("habitDuration") ?: "",
+                        createdBy = groupDoc.getString("createdBy") ?: "",
+                        quote = groupDoc.getString("quote") ?: "",
+                        groupCode = groupDoc.getString("groupCode") ?: "",
+                        members = groupDoc.get("members") as? List<String> ?: emptyList(),
+                        groupStatus = groupDoc.getString("groupStatus") ?: "WAITING",
+                        startDeadline = groupDoc.getLong("startDeadline") ?: 0,
+                        actualStartDate = groupDoc.getLong("actualStartDate")
                     )
-                    
-                    // Oluşturulan grup nesnesini logla
-                    Log.d("GroupsAddViewModel", "Created group object:")
-                    Log.d("GroupsAddViewModel", "isPrivate: ${group.isPrivate}")
-                    Log.d("GroupsAddViewModel", "participationType: ${group.participationType}")
-                    
-                    _groupDetailState.value = GroupDetailState.Success(group)
+                    _groupDetailState.value = GroupDetailState.Success(group!!)
                 } else {
-                    Log.e("GroupsAddViewModel", "Group document does not exist")
                     _groupDetailState.value = GroupDetailState.Error("Grup bulunamadı")
                 }
             } catch (e: Exception) {
-                Log.e("GroupsAddViewModel", "Error fetching group details", e)
-                _groupDetailState.value = GroupDetailState.Error("Grup detayları yüklenirken hata oluştu: ${e.message}")
+                _groupDetailState.value =
+                    GroupDetailState.Error(e.message ?: "Bilinmeyen bir hata oluştu")
             }
         }
     }
@@ -407,7 +661,7 @@ class GroupsAddViewModel @Inject constructor(
                 db.runTransaction { transaction ->
                     val groupRef = db.collection("groups").document(groupId)
                     val userRef = db.collection("users").document(userId)
-                    
+
                     transaction.update(groupRef, "members", FieldValue.arrayUnion(userId))
                     transaction.update(userRef, "joinedGroups", FieldValue.arrayUnion(groupId))
                 }.addOnSuccessListener {
@@ -415,13 +669,15 @@ class GroupsAddViewModel @Inject constructor(
                         getGroupById(groupId)
                         getUsersName(userId)
                         getProfile(userId)
-                        _joinGroupState.value = "Tebrikler! 🎉 Grubumuza katıldınız, şimdi hep birlikte daha güçlüyüz!"
+                        _joinGroupState.value =
+                            "Tebrikler! 🎉 Grubumuza katıldınız, şimdi hep birlikte daha güçlüyüz!"
                     }
                 }.addOnFailureListener { e ->
                     Log.e("Firestore", "Error joining group", e)
                     _joinGroupState.value = when {
-                        e.message?.contains("PERMISSION_DENIED") == true -> 
+                        e.message?.contains("PERMISSION_DENIED") == true ->
                             "Gruba katılma izniniz yok."
+
                         else -> "Gruba katılırken bir hata oluştu: ${e.localizedMessage}"
                     }
                 }
@@ -475,7 +731,7 @@ class GroupsAddViewModel @Inject constructor(
                 }
 
                 val snapshot = query.get().await()
-                
+
                 if (snapshot.isEmpty) {
                     _hasMoreData.value = false
                     _hasMoreDataFlag = false
@@ -483,24 +739,31 @@ class GroupsAddViewModel @Inject constructor(
                 }
 
                 lastDocument = snapshot.documents.lastOrNull()
-                
+
                 val groups = snapshot.documents.mapNotNull { document ->
                     try {
-                        Group(
-                            groupId = document.getString("groupId") ?: "",
+                        document.toObject<Group>()?.copy(
+                            groupId = document.id,
                             groupName = document.getString("groupName") ?: "",
                             category = document.getString("category") ?: "",
                             frequency = document.getString("frequency") ?: "",
                             isPrivate = document.getBoolean("private") ?: false,
                             participationType = document.getString("participationType") ?: "",
-                            participantNumber = document.getLong("participantNumber")?.toInt() ?: 0,
+                            muxParticipationCount = document.getLong("muxParticipationCount")
+                                ?.toInt() ?: 15,
+                            minParticipationCount = document.getLong("minParticipationCount")
+                                ?.toInt() ?: 7,
+                            groupStartTime = document.getString("groupStartTime") ?: "1",
                             description = document.getString("description") ?: "",
                             createdAt = document.getLong("createdAt") ?: 0,
-                            createdBy = document.getString("createdBy") ?: "",
                             habitDuration = document.getString("habitDuration") ?: "",
+                            createdBy = document.getString("createdBy") ?: "",
                             quote = document.getString("quote") ?: "",
                             groupCode = document.getString("groupCode") ?: "",
-                            members = (document.get("members") as? List<String>) ?: emptyList()
+                            members = document.get("members") as? List<String> ?: emptyList(),
+                            groupStatus = document.getString("groupStatus") ?: "WAITING",
+                            startDeadline = document.getLong("startDeadline") ?: 0,
+                            actualStartDate = document.getLong("actualStartDate")
                         )
                     } catch (e: Exception) {
                         Log.e("GroupsAdd", "Error parsing group document", e)
@@ -518,14 +781,15 @@ class GroupsAddViewModel @Inject constructor(
                 _groupListState.value = GroupListState.Success(currentGroups)
                 isLoading = false
             } catch (e: Exception) {
-                _groupListState.value = GroupListState.Error("Beklenmeyen bir hata oluştu: ${e.message}")
+                _groupListState.value =
+                    GroupListState.Error(e.message ?: "Bilinmeyen bir hata oluştu")
                 Log.e("GroupsAdd", "Error fetching groups", e)
                 isLoading = false
             }
         }
     }
 
-    private fun resetGroupList() {
+    fun resetGroupList() {
         lastDocument = null
         _hasMoreDataFlag = true
         _hasMoreData.value = true
@@ -548,10 +812,12 @@ class GroupsAddViewModel @Inject constructor(
                 currentPrivacy = "Özel"
                 currentCategory = "Tümü"
             }
+
             "Açık" -> {
                 currentPrivacy = "Açık"
                 currentCategory = "Tümü"
             }
+
             else -> {
                 if (category == "Tümü") {
                     currentPrivacy = null
@@ -564,12 +830,12 @@ class GroupsAddViewModel @Inject constructor(
 
     // Guruba katılma isteğin kontrol edildiği ve gurup kodun kontrol edildiği fonksiyon
     suspend fun requestJoinGroup(
-    groupId: String,
-    userId: String,
-    joinCode: String?,
-    participantNumber: Int,
-    members: List<String>
-) {
+        groupId: String,
+        userId: String,
+        joinCode: String?,
+        participantNumber: Int,
+        members: List<String>
+    ) {
         try {
             val userDoc = db.collection("users").document(userId).get().await()
             val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
@@ -588,7 +854,7 @@ class GroupsAddViewModel @Inject constructor(
 
             val groupRef = db.collection("groups").document(groupId)
             val group = groupRef.get().await()
-            
+
             if (!group.exists()) {
                 _joinGroupState.value = "Grup bulunamadı"
                 return
@@ -624,10 +890,12 @@ class GroupsAddViewModel @Inject constructor(
                         _joinGroupState.value = "Bu gruba zaten katılım isteği gönderdiniz"
                         return
                     }
+
                     "accepted" -> {
                         _joinGroupState.value = "Bu gruba zaten kabul edildiniz"
                         return
                     }
+
                     "rejected" -> {
                         _joinGroupState.value = "Bu gruba katılım isteğiniz reddedilmişti"
                         return
@@ -682,6 +950,33 @@ class GroupsAddViewModel @Inject constructor(
         }
     }
 
+
+    // eğer alışkanlıklar tamamlandıysa bunlarda ekleme yapılacak
+    suspend fun updateGroupStats(frequency: String){
+        try {
+            val currentUserId = auth.currentUser?.uid ?:return
+            val userRef = db.collection("users").document(currentUserId)
+            val statsRef = userRef.collection("stats").document("habitStats")
+
+
+            db.runTransaction {transaction->
+                val currentStates = transaction.get(statsRef).toObject<GroupHabitStats>() ?:GroupHabitStats()
+                val updatedStats = when(frequency){
+                    "Günlük" -> currentStates.copy(dailyGroupsCompleted = currentStates.dailyGroupsCompleted + 1)
+                    "Haftalık"-> currentStates.copy(weeklyGroupsCompleted = currentStates.weeklyGroupsCompleted + 1 )
+                    "Aylık"-> currentStates.copy(monthlyGroupsCompleted = currentStates.monthlyGroupsCompleted + 1)
+                    else -> currentStates
+                }
+
+                transaction.set(statsRef, updatedStats, SetOptions.merge())
+
+            }.await()
+
+        }catch (e:Exception){
+            Log.e("GroupStats", "Error updating group stats", e)
+        }
+    }
+
     private suspend fun sendNotificationToAdmin(
         adminId: String,
         userName: String,
@@ -726,20 +1021,28 @@ class GroupsAddViewModel @Inject constructor(
                     val groups = joinedGroups.mapNotNull { groupId ->
                         val groupDoc = db.collection("groups").document(groupId).get().await()
                         if (groupDoc.exists()) {
-                            Group(
-                                groupId = groupDoc.getString("groupId") ?: "",
+                            groupDoc.toObject<Group>()?.copy(
+                                groupId = groupDoc.id,
                                 groupName = groupDoc.getString("groupName") ?: "",
                                 category = groupDoc.getString("category") ?: "",
                                 frequency = groupDoc.getString("frequency") ?: "",
                                 isPrivate = groupDoc.getBoolean("private") ?: false,
                                 participationType = groupDoc.getString("participationType") ?: "",
-                                participantNumber = groupDoc.getLong("participantNumber")?.toInt() ?: 0,
+                                muxParticipationCount = groupDoc.getLong("muxParticipationCount")
+                                    ?.toInt() ?: 15,
+                                minParticipationCount = groupDoc.getLong("minParticipationCount")
+                                    ?.toInt() ?: 7,
+                                groupStartTime = groupDoc.getString("groupStartTime") ?: "1",
                                 description = groupDoc.getString("description") ?: "",
                                 createdAt = groupDoc.getLong("createdAt") ?: 0,
-                                createdBy = groupDoc.getString("createdBy") ?: "",
                                 habitDuration = groupDoc.getString("habitDuration") ?: "",
+                                createdBy = groupDoc.getString("createdBy") ?: "",
                                 quote = groupDoc.getString("quote") ?: "",
-                                members = (groupDoc.get("members") as? List<String>) ?: emptyList()
+                                groupCode = groupDoc.getString("groupCode") ?: "",
+                                members = groupDoc.get("members") as? List<String> ?: emptyList(),
+                                groupStatus = groupDoc.getString("groupStatus") ?: "WAITING",
+                                startDeadline = groupDoc.getLong("startDeadline") ?: 0,
+                                actualStartDate = groupDoc.getLong("actualStartDate")
                             )
                         } else null
                     }
@@ -751,12 +1054,14 @@ class GroupsAddViewModel @Inject constructor(
             }
         }
     }
-    
+
     // Helper function to get current user ID
     fun getCurrentUserId(): String? {
         return auth.currentUser?.uid
     }
-    
+
+
+
     // Helper function to get current user name - cached or fetch from Firestore
     fun getCurrentUserName(): String? {
         val userId = getCurrentUserId() ?: return null
@@ -765,7 +1070,7 @@ class GroupsAddViewModel @Inject constructor(
         if (cachedName != null) {
             return cachedName
         }
-        
+
         // If not cached, try to fetch (will be async, but at least future calls will have it)
         viewModelScope.launch {
             try {
@@ -773,7 +1078,7 @@ class GroupsAddViewModel @Inject constructor(
                     .document(userId)
                     .get()
                     .await()
-                
+
                 if (document.exists()) {
                     val userName = document.getString("name") ?: "Misafir"
                     _userNames.value += (userId to userName)
@@ -782,7 +1087,7 @@ class GroupsAddViewModel @Inject constructor(
                 Log.e("GroupsAddViewModel", "Error fetching user name", e)
             }
         }
-        
+
         return "Misafir" // Default fallback name if not immediately available
     }
 
@@ -793,19 +1098,22 @@ class GroupsAddViewModel @Inject constructor(
             try {
                 // Set initial loading state
                 _chatMessage.value = MessagesState.Loading
-                
+
                 // Clean up old messages first
-                cleanupOldMessages(groupId, context)
-                
+                cleanupOldMessages(groupId,context)
+
+                // Listen for vote state changes
+                listenToVoteState(groupId)
+
                 // Get current user ID to determine which messages are from the current user
                 val currentUserId = getCurrentUserId()
-                
+
                 // Create a listener for real-time updates
                 val messagesRef = db.collection("groups")
                     .document(groupId)
                     .collection("messages")
                     .orderBy("timestamp", Query.Direction.ASCENDING)
-                
+
                 // Use addSnapshotListener for real-time updates
                 messagesRef.addSnapshotListener { snapshot, error ->
                     if (error != null) {
@@ -813,7 +1121,7 @@ class GroupsAddViewModel @Inject constructor(
                         _chatMessage.value = MessagesState.Error("Mesajlar yüklenirken hata oluştu")
                         return@addSnapshotListener
                     }
-                    
+
                     if (snapshot != null) {
                         val messagesList = snapshot.documents.mapNotNull { doc ->
                             try {
@@ -824,17 +1132,17 @@ class GroupsAddViewModel @Inject constructor(
                                 val timestamp = doc.getLong("timestamp") ?: 0L
                                 // Determine if the message is from current user based on sender ID
                                 val isCurrentUser = (senderId == currentUserId)
-                                
+
                                 // Ensure we load profile image for this user
                                 if (!_profileImages.value.containsKey(senderId)) {
                                     getProfile(senderId)
                                 }
-                                
+
                                 // Ensure we have the user name
                                 if (!_userNames.value.containsKey(senderId)) {
                                     getUsersName(senderId)
                                 }
-                                
+
                                 ChatMessage(
                                     messageId = messageId,
                                     senderId = senderId,
@@ -848,9 +1156,9 @@ class GroupsAddViewModel @Inject constructor(
                                 null
                             }
                         }
-                        
+
                         _messages.value = messagesList
-                        
+
                         // If we have messages, update the success state with the last one
                         if (messagesList.isNotEmpty()) {
                             val lastMessage = messagesList.last()
@@ -863,7 +1171,7 @@ class GroupsAddViewModel @Inject constructor(
                                 "isCurrentUser" to lastMessage.isCurrentUser.toString()
                             )
                             _chatMessage.value = MessagesState.Success(messageMap)
-                            Log.e("GroupsAddViewModel","GroupsAddViewModel:$messageMap")
+                            Log.e("GroupsAddViewModel", "GroupsAddViewModel:$messageMap")
                         } else {
                             // Empty message list is still a success state
                             _chatMessage.value = MessagesState.Success(hashMapOf("empty" to true))
@@ -872,7 +1180,8 @@ class GroupsAddViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e("GroupsAddViewModel", "Error in getGroupMessages", e)
-                _chatMessage.value = MessagesState.Error("Mesajlar yüklenirken beklenmeyen bir hata oluştu")
+                _chatMessage.value =
+                    MessagesState.Error("Mesajlar yüklenirken beklenmeyen bir hata oluştu")
             }
         }
     }
@@ -885,9 +1194,9 @@ class GroupsAddViewModel @Inject constructor(
             Log.d("MesajTemizleme", "Temizleme işlemi zaten devam ediyor, yeni işlem atlanıyor")
             return
         }
-        
+
         isCleanupRunning = true
-        
+
         viewModelScope.launch {
             try {
                 Log.d("MesajTemizleme", "Zamanlanmış mesaj temizleme başlatılıyor...")
@@ -897,33 +1206,286 @@ class GroupsAddViewModel @Inject constructor(
                     isCleanupRunning = false
                     return@launch
                 }
-                
+
                 Log.d("MesajTemizleme", "Kullanıcının katıldığı gruplar alınıyor: $currentUserId")
                 // Get user's joined groups
                 val userDoc = db.collection("users").document(currentUserId).get().await()
                 val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
-                
-                Log.d("MesajTemizleme", "Kullanıcı ${joinedGroups.size} gruba üye, mesajlar temizleniyor...")
-                
+
+                Log.d(
+                    "MesajTemizleme",
+                    "Kullanıcı ${joinedGroups.size} gruba üye, mesajlar temizleniyor..."
+                )
+
                 // Clean up messages in each group
                 for (groupId in joinedGroups) {
                     try {
                         Log.d("MesajTemizleme", "$groupId kodlu grup için mesajlar temizleniyor")
-                        cleanupOldMessages(groupId, context)
+                        cleanupOldMessages(groupId,context)
                         Log.d("MesajTemizleme", "$groupId kodlu grup için temizlik tamamlandı")
                     } catch (e: Exception) {
-                        Log.e("MesajTemizleme", "$groupId kodlu grup için mesaj temizleme sırasında hata: ${e.message}", e)
+                        Log.e(
+                            "MesajTemizleme",
+                            "$groupId kodlu grup için mesaj temizleme sırasında hata: ${e.message}",
+                            e
+                        )
                     }
                 }
-                
-                Log.d("MesajTemizleme", "Zamanlanmış mesaj temizleme işlemi tüm gruplar için tamamlandı")
+
+                Log.d(
+                    "MesajTemizleme",
+                    "Zamanlanmış mesaj temizleme işlemi tüm gruplar için tamamlandı"
+                )
             } catch (e: Exception) {
-                Log.e("MesajTemizleme", "Zamanlanmış mesaj temizleme sırasında hata: ${e.message}", e)
+                Log.e(
+                    "MesajTemizleme",
+                    "Zamanlanmış mesaj temizleme sırasında hata: ${e.message}",
+                    e
+                )
             } finally {
                 isCleanupRunning = false
             }
         }
     }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun initiateGroupCloseVote(groupId: String , context: Context) {
+        viewModelScope.launch {
+            try {
+                Log.d("OylamaBaslatma", "Grup kapatma oylaması başlatılıyor: $groupId")
+                
+                val currentUserId = auth.currentUser?.uid
+                if (currentUserId == null) {
+                    Log.e("OylamaBaslatma", "Kullanıcı oturumu bulunamadı")
+                    return@launch
+                }
+                
+                // Grup bilgilerini al
+                val groupRef = db.collection("groups").document(groupId)
+                val groupDoc = groupRef.get().await()
+                val group = groupDoc.toObject<Group>()
+                
+                if (group?.createdBy != currentUserId) {
+                    Log.e("OylamaBaslatma", "Sadece grup yöneticisi oylama başlatabilir")
+                    return@launch
+                }
+                
+                Log.d("OylamaBaslatma", "Grup üye sayısı: ${group.members.size}")
+                
+                val currentServerTime = NetworkUtils.getTime(context = context)
+                val votingEndTime = currentServerTime + (24 * 60 * 60 * 1000)
+                
+                Log.d("OylamaBaslatma", "Oylama bitiş zamanı: ${formatTimestampForLog(votingEndTime)}")
+                
+                // Oylama verilerini hazırla
+                val voteData = hashMapOf(
+                    "votingEndTime" to votingEndTime,
+                    "yesVotes" to 0,
+                    "noVotes" to 0,
+                    "totalMembers" to group.members.size,
+                    "votedMembers" to listOf<String>(),
+                    "initiatedBy" to currentUserId,
+                    "initiatedAt" to currentServerTime
+                )
+                
+                // Önce mevcut oylamayı kontrol et ve temizle
+                val existingVoteRef = groupRef.collection("closeVote").document("status")
+                val existingVote = existingVoteRef.get().await()
+                if (existingVote.exists()) {
+                    Log.d("OylamaBaslatma", "Mevcut oylama siliniyor")
+                    existingVoteRef.delete().await()
+                }
+                
+                // Yeni oylamayı oluştur
+                groupRef.collection("closeVote").document("status")
+                    .set(voteData)
+                    .addOnSuccessListener {
+                        Log.d("OylamaBaslatma", "Oylama başarıyla oluşturuldu")
+                        
+                        // State'i güncelle
+                        _groupCloseVoteState.value += (groupId to GroupCloseVoteState(
+                            votingEndTime = votingEndTime,
+                            yesVotes = 0,
+                            noVotes = 0,
+                            totalMembers = group.members.size,
+                            hasUserVoted = false,
+                            canAdminInitiateVote = false
+                        ))
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("OylamaBaslatma", "Oylama oluşturulurken hata: ${e.localizedMessage}")
+                    }
+                
+                // 24 saat sonra oylama sonucunu kontrol et
+                scheduleVoteCheck(groupId, votingEndTime , context)
+                
+            } catch (e: Exception) {
+                Log.e("OylamaBaslatma", "Beklenmeyen hata: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    fun submitVote(groupId: String, isYesVote: Boolean) {
+        viewModelScope.launch {
+            try {
+                Log.d("OyVerme", "Oy verme işlemi başlatılıyor...")
+                val currentUserId = auth.currentUser?.uid ?: return@launch
+                val groupRef = db.collection("groups").document(groupId)
+                val voteRef = groupRef.collection("closeVote").document("status")
+
+                // Önce dokümanın varlığını kontrol et
+                val voteDoc = voteRef.get().await()
+                if (!voteDoc.exists()) {
+                    Log.e("OyVerme", "Oylama dokümanı bulunamadı")
+                    return@launch
+                }
+
+                Log.d("OyVerme", "Oylama dokümanı bulundu, transaction başlatılıyor")
+                
+                db.runTransaction { transaction ->
+                    val currentVoteDoc = transaction.get(voteRef)
+                    val votedMembers = currentVoteDoc.get("votedMembers") as? List<String> ?: listOf()
+                    
+                    if (currentUserId !in votedMembers) {
+                        val yesVotes = currentVoteDoc.getLong("yesVotes")?.toInt() ?: 0
+                        val noVotes = currentVoteDoc.getLong("noVotes")?.toInt() ?: 0
+                        
+                        Log.d("OyVerme", "Mevcut oylar - Evet: $yesVotes, Hayır: $noVotes")
+                        Log.d("OyVerme", "Kullanıcı ${if (isYesVote) "EVET" else "HAYIR"} oyu kullanıyor")
+                        
+                        val updates = mutableMapOf<String, Any>()
+                        if (isYesVote) {
+                            updates["yesVotes"] = yesVotes + 1
+                        } else {
+                            updates["noVotes"] = noVotes + 1
+                        }
+                        updates["votedMembers"] = votedMembers + currentUserId
+                        
+                        transaction.update(voteRef, updates)
+                        Log.d("OyVerme", "Oy başarıyla kaydedildi")
+                    } else {
+                        Log.d("OyVerme", "Kullanıcı zaten oy kullanmış")
+                    }
+                }.addOnSuccessListener {
+                    Log.d("OyVerme", "Transaction başarıyla tamamlandı")
+                    viewModelScope.launch {
+                        updateVoteState(groupId)
+                    }
+                }.addOnFailureListener { e ->
+                    Log.e("OyVerme", "Transaction sırasında hata: ${e.localizedMessage}")
+                }
+                
+            } catch (e: Exception) {
+                Log.e("OyVerme", "Oy verme işlemi sırasında hata: ${e.localizedMessage}")
+            }
+        }
+    }
+
+    private fun updateVoteState(groupId: String) {
+        viewModelScope.launch {
+            try {
+                val voteRef = db.collection("groups").document(groupId)
+                    .collection("closeVote").document("status")
+                val voteDoc = voteRef.get().await()
+                
+                if (voteDoc.exists()) {
+                    val currentState = GroupCloseVoteState(
+                        votingEndTime = voteDoc.getLong("votingEndTime") ?: 0,
+                        yesVotes = voteDoc.getLong("yesVotes")?.toInt() ?: 0,
+                        noVotes = voteDoc.getLong("noVotes")?.toInt() ?: 0,
+                        totalMembers = voteDoc.getLong("totalMembers")?.toInt() ?: 0,
+                        hasUserVoted = auth.currentUser?.uid in (voteDoc.get("votedMembers") as? List<String> ?: emptyList()),
+                        canAdminInitiateVote = false
+                    )
+                    _groupCloseVoteState.value += (groupId to currentState)
+                }
+            } catch (e: Exception) {
+                Log.e("GroupClose", "Error updating vote state", e)
+            }
+        }
+    }
+
+    // oy kontrolu zamanla
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun scheduleVoteCheck(groupId: String, votingEndTime: Long , context: Context) {
+        viewModelScope.launch {
+            val currentServerTime = NetworkUtils.getTime(context = context)
+            try {
+                val delayMillis = votingEndTime - currentServerTime
+                if (delayMillis > 0) {
+                    kotlinx.coroutines.delay(delayMillis)
+                    checkVoteResult(groupId)
+                }
+            } catch (e: Exception) {
+                Log.e("GroupClose", "Error scheduling vote check", e)
+            }
+        }
+    }
+
+    private suspend fun checkVoteResult(groupId: String) {
+        try {
+            val voteRef = db.collection("groups").document(groupId)
+                .collection("closeVote").document("status")
+            val voteDoc = voteRef.get().await()
+            
+            if (voteDoc.exists()) {
+                val yesVotes = voteDoc.getLong("yesVotes")?.toInt() ?: 0
+                val noVotes = voteDoc.getLong("noVotes")?.toInt() ?: 0
+                val totalMembers = voteDoc.getLong("totalMembers")?.toInt() ?: 0
+                
+                // Eğer evet oyları çoğunluktaysa grubu kapat
+                if (yesVotes > noVotes && yesVotes > totalMembers / 2) {
+                    closeGroup(groupId)
+                }
+                
+                // Oylama sonuçlarını arşivle ve state'i temizle
+                voteRef.delete()
+                _groupCloseVoteState.value -= groupId
+            }
+        } catch (e: Exception) {
+            Log.e("GroupClose", "Error checking vote result", e)
+        }
+    }
+
+    private fun listenToVoteState(groupId: String) {
+        viewModelScope.launch {
+            try {
+                val voteRef = db.collection("groups").document(groupId)
+                    .collection("closeVote").document("status")
+                
+                voteRef.addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.e("VoteState", "Error listening to vote state", error)
+                        return@addSnapshotListener
+                    }
+                    
+                    if (snapshot != null && snapshot.exists()) {
+                        val votingEndTime = snapshot.getLong("votingEndTime") ?: 0
+                        val yesVotes = snapshot.getLong("yesVotes")?.toInt() ?: 0
+                        val noVotes = snapshot.getLong("noVotes")?.toInt() ?: 0
+                        val totalMembers = snapshot.getLong("totalMembers")?.toInt() ?: 0
+                        val votedMembers = snapshot.get("votedMembers") as? List<String> ?: emptyList()
+                        val currentUserId = getCurrentUserId()
+                        
+                        val voteState = GroupCloseVoteState(
+                            votingEndTime = votingEndTime,
+                            yesVotes = yesVotes,
+                            noVotes = noVotes,
+                            totalMembers = totalMembers,
+                            hasUserVoted = currentUserId in votedMembers,
+                            canAdminInitiateVote = false
+                        )
+                        
+                        _groupCloseVoteState.value += (groupId to voteState)
+                    } else {
+                        // Oylama yoksa state'ten kaldır
+                        _groupCloseVoteState.value -= groupId
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("VoteState", "Error setting up vote state listener", e)
+            }
+        }
+    }
+
 }
-
-

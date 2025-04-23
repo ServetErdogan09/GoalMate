@@ -94,12 +94,16 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.4.0") // resimleri yüklemek için
 
+    implementation ("com.google.code.gson:gson:2.10.1")
     implementation("com.google.dagger:hilt-android:2.51.1")
     implementation ("androidx.work:work-runtime-ktx:2.8.1")// WorkManager
     implementation ("androidx.hilt:hilt-work:1.2.0") // workManager
     kapt("com.google.dagger:hilt-android-compiler:2.51.1")
     kapt("androidx.hilt:hilt-compiler:1.2.0")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+
+    //(durum çubugu rengi vb)
+    implementation ("com.google.accompanist:accompanist-systemuicontroller:0.28.0")
 
 
     // API 33 ve üzeri
