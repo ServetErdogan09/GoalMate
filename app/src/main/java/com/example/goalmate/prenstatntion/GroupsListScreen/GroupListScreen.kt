@@ -22,11 +22,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.Text
+import androidx.compose.material.Tab
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TabRow
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,15 +43,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,7 +63,8 @@ import com.example.goalmate.extrensions.GroupListState
 import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.example.goalmate.viewmodel.RegisterViewModel
-
+import com.example.goalmate.utils.NetworkUtils
+import kotlinx.coroutines.delay
 
 @Composable
 fun GroupListScreen(
@@ -67,122 +72,193 @@ fun GroupListScreen(
     viewModel: GroupsAddViewModel = viewModel(),
     registerViewModel: RegisterViewModel = viewModel()
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
-    val groupListState = viewModel.groupListState.collectAsState().value
-    val myGroups by viewModel.myGroups.collectAsState()
-    Log.e("myGroups","myGroups . $myGroups")
+    val context = LocalContext.current
+    var hasInternet by remember { mutableStateOf(NetworkUtils.isNetworkAvailable(context)) }
 
-    // Her görüntülendiğinde verileri yenile
+    // İnternet bağlantısını sürekli kontrol et
     LaunchedEffect(Unit) {
-        viewModel.getUserGroups()
-        viewModel.resetGroupList()
-    }
-
-    // Tab değiştiğinde de verileri yenile
-    LaunchedEffect(selectedTab) {
-        if (selectedTab == 1) {
-            viewModel.getUserGroups()
-        } else {
-            viewModel.resetGroupList()
+        while (true) {
+            hasInternet = NetworkUtils.isNetworkAvailable(context)
+            if (!hasInternet) {
+                // İnternet yoksa tüm verileri temizle
+                viewModel.resetGroupList()
+                viewModel.getUserGroups()
+            }
+            delay(1000) // Her saniye kontrol et
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(color = colorResource(R.color.arkaplan))
-            .padding(top = 25.dp, bottom = 110.dp)
+    Box(
+        modifier = Modifier.fillMaxSize()
     ) {
-        Spacer(modifier = Modifier.padding(top = 15.dp))
-        // Tabs
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = colorResource(R.color.beyaz),
-            contentColor = colorResource(R.color.kutubordrengi)
-        ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = {
-                    selectedTab = 0
-
-                          },
-                text = { Text("Tüm Gruplar") }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("Katıldığım Gruplar") }
-            )
+        // İnternet yoksa uyarı göster
+        if (!hasInternet) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colorResource(R.color.arkaplan)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colorResource(R.color.beyaz))
+                        .padding(24.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.internet),
+                        contentDescription = null,
+                        modifier = Modifier.size(200.dp).
+                        background(color = colorResource(R.color.arkaplan))
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = "İnternet Bağlantısı Yok",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = colorResource(R.color.yazirengi),
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "Gruplara erişmek için internet bağlantısı gereklidir. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(R.color.yazirengi),
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(
+                        onClick = { navController.popBackStack() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colorResource(id = R.color.kutubordrengi)
+                        )
+                    ) {
+                        Text(
+                            text = "Geri Dön",
+                            color = colorResource(R.color.beyaz)
+                        )
+                    }
+                }
+            }
+            return
         }
 
-        when (selectedTab) {
-            0 -> {
-                // Tüm Gruplar Tab'ı
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                        .background(colorResource(R.color.beyaz))
-                ) {
-                    Spacer(modifier = Modifier.height(15.dp))
-                    Groupcategory(viewModel)
-                    Spacer(modifier = Modifier.height(10.dp))
+        // Ana içerik (internet varsa)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(color = colorResource(R.color.arkaplan))
+                .padding(top = 25.dp, bottom = 110.dp)
+        ) {
+            var selectedTab by remember { mutableStateOf(0) }
+            val groupListState = viewModel.groupListState.collectAsState().value
+            val myGroups by viewModel.myGroups.collectAsState()
 
-                    when(groupListState) {
-                        is GroupListState.Loading -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    color = colorResource(R.color.kutubordrengi),
-                                    modifier = Modifier.size(48.dp)
-                                )
-                            }
+            // Her görüntülendiğinde verileri yenile
+            LaunchedEffect(Unit) {
+                if (hasInternet) {
+                    viewModel.getUserGroups()
+                    viewModel.resetGroupList()
+                }
+            }
+
+            // Tab değiştiğinde de verileri yenile
+            LaunchedEffect(selectedTab) {
+                if (hasInternet) {
+                    if (selectedTab == 1) {
+                        viewModel.getUserGroups()
+                    } else {
+                        viewModel.resetGroupList()
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.padding(top = 15.dp))
+            
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = colorResource(R.color.beyaz),
+                contentColor = colorResource(R.color.kutubordrengi)
+            ) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { if (hasInternet) selectedTab = 0 },
+                    enabled = hasInternet,
+                    text = { Text("Tüm Gruplar") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { if (hasInternet) selectedTab = 1 },
+                    enabled = hasInternet,
+                    text = { Text("Katıldığım Gruplar") }
+                )
+            }
+
+            when(selectedTab) {
+                0 -> {
+                    // Tüm Gruplar Tab'ı
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                            .background(colorResource(R.color.beyaz))
+                    ) {
+                        Spacer(modifier = Modifier.height(15.dp))
+                        if (hasInternet) {
+                            Groupcategory(viewModel)
                         }
-                        is GroupListState.Error -> {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = groupListState.message,
-                                    color = colorResource(R.color.pastelkirmizi),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        }
-                        is GroupListState.Success -> {
-                            if (groupListState.groups.isEmpty()) {
-                                EmptyGroupState(selectedTab)
-                            } else {
-                                LazyColumn(
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        when(groupListState) {
+                            is GroupListState.Loading -> {
+                                Box(
                                     modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    items(groupListState.groups) { group ->
-                                        GroupCard(group = group, groupsAddViewModel = viewModel, navController)
-                                    }
-
-                                    item {
-                                        val hasMoreData by viewModel.hasMoreData.collectAsState()
-                                        if (hasMoreData) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(8.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(32.dp),
-                                                    color = colorResource(R.color.kutubordrengi)
-                                                )
-                                            }
-
-                                            LaunchedEffect(Unit) {
-                                                viewModel.loadMoreGroups()
-                                            }
+                                    CircularProgressIndicator(
+                                        color = colorResource(R.color.kutubordrengi),
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                }
+                            }
+                            is GroupListState.Error -> {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = groupListState.message,
+                                        color = colorResource(R.color.pastelkirmizi),
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                            }
+                            is GroupListState.Success -> {
+                                if (groupListState.groups.isEmpty()) {
+                                    EmptyGroupState(selectedTab)
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(groupListState.groups) { group ->
+                                            GroupCard(
+                                                group = group,
+                                                groupsAddViewModel = viewModel,
+                                                navController = navController,
+                                                enabled = hasInternet
+                                            )
                                         }
                                     }
                                 }
@@ -190,33 +266,29 @@ fun GroupListScreen(
                         }
                     }
                 }
-            }
-            1 -> {
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                        .background(colorResource(R.color.beyaz))
-                        .padding(20.dp)
-                ) {
-                    if (myGroups.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
+                1 -> {
+                    // Katıldığım Gruplar Tab'ı
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                            .background(colorResource(R.color.beyaz))
+                            .padding(20.dp)
+                    ) {
+                        if (myGroups.isEmpty()) {
                             EmptyGroupState(selectedTab)
-                        }
-                    } else {
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(myGroups) { group ->
-                                GroupCard(
-                                    group = group,
-                                    groupsAddViewModel = viewModel,
-                                    navController = navController
-                                )
+                        } else {
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(myGroups) { group ->
+                                    GroupCard(
+                                        group = group,
+                                        groupsAddViewModel = viewModel,
+                                        navController = navController,
+                                        enabled = hasInternet
+                                    )
+                                }
                             }
                         }
                     }
@@ -228,6 +300,9 @@ fun GroupListScreen(
 
 @Composable
 fun Groupcategory(viewModel: GroupsAddViewModel) {
+    val context = LocalContext.current
+    val hasInternet = NetworkUtils.isNetworkAvailable(context)
+    
     val groupList = listOf("Tümü", "Özel", "Açık", "Sağlık", "Kişisel Gelişim", "Sosyal ilişkiler", "Finans","Kariyer" , "Teknoloji", "Çevre","Diğer")
     var selectedMainCategory by remember { mutableStateOf<String?>("Tümü") }
     var selectedPrivacy by remember { mutableStateOf<String?>(null) }
@@ -245,10 +320,13 @@ fun Groupcategory(viewModel: GroupsAddViewModel) {
                     category = categoryItem,
                     isSelected = selectedMainCategory == categoryItem && selectedPrivacy == null,
                     onSelected = { 
-                        selectedMainCategory = categoryItem
-                        selectedPrivacy = null
-                        viewModel.setFilters(categoryItem)
-                    }
+                        if (hasInternet) {
+                            selectedMainCategory = categoryItem
+                            selectedPrivacy = null
+                            viewModel.setFilters(categoryItem)
+                        }
+                    },
+                    enabled = hasInternet
                 )
             }
         }
@@ -268,9 +346,12 @@ fun Groupcategory(viewModel: GroupsAddViewModel) {
                         category = "$selectedMainCategory $privacyItem",
                         isSelected = selectedPrivacy == privacyItem,
                         onSelected = {
-                            selectedPrivacy = privacyItem
-                            viewModel.setFilters(privacyItem)
-                        }
+                            if (hasInternet) {
+                                selectedPrivacy = privacyItem
+                                viewModel.setFilters(privacyItem)
+                            }
+                        },
+                        enabled = hasInternet
                     )
                 }
             }
@@ -282,43 +363,76 @@ fun Groupcategory(viewModel: GroupsAddViewModel) {
 fun CategoryChip(
     category: String,
     isSelected: Boolean,
-    onSelected: () -> Unit
+    onSelected: () -> Unit,
+    enabled: Boolean = true
 ) {
     Surface(
-        modifier = Modifier.clickable { onSelected() },
+        modifier = Modifier.clickable(
+            enabled = enabled,
+            onClick = onSelected
+        ),
         shape = RoundedCornerShape(50),
         color = if (isSelected) colorResource(R.color.kutubordrengi) else Color.Transparent,
         border = BorderStroke(
             width = 1.dp,
-            color = if (isSelected) colorResource(R.color.kutubordrengi) else colorResource(R.color.acik_gri)
+            color = if (isSelected) 
+                colorResource(R.color.kutubordrengi) 
+            else if (!enabled)
+                colorResource(R.color.acik_gri).copy(alpha = 0.5f)
+            else 
+                colorResource(R.color.acik_gri)
         )
     ) {
         Text(
             text = category,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = if (isSelected) Color.White else colorResource(R.color.yazirengi),
+            color = if (isSelected) 
+                Color.White 
+            else if (!enabled)
+                colorResource(R.color.yazirengi).copy(alpha = 0.5f)
+            else 
+                colorResource(R.color.yazirengi),
             style = MaterialTheme.typography.bodyMedium
         )
     }
 }
 
 @Composable
-fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navController: NavController) {
+fun GroupCard(
+    group: Group,
+    groupsAddViewModel: GroupsAddViewModel,
+    navController: NavController,
+    enabled: Boolean = true
+) {
     val profileImages = groupsAddViewModel.profileImages.collectAsState().value
     val creatorProfileImage = profileImages[group.createdBy] ?: ""
 
     LaunchedEffect(group.createdBy) {
-        groupsAddViewModel.getProfile(group.createdBy)
+        if (enabled) {
+            groupsAddViewModel.getProfile(group.createdBy)
+        }
     }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(150.dp)
-            .clickable { navController.navigate("GroupDetailScreen/${group.groupId}/${group.groupName}") },
-        border = BorderStroke(width = 0.2.dp , color = colorResource(R.color.yazirengi)),
+            .clickable(
+                enabled = enabled,
+                onClick = { 
+                    if (enabled) {
+                        navController.navigate("GroupDetailScreen/${group.groupId}/${group.groupName}")
+                    }
+                }
+            ),
+        border = BorderStroke(width = 0.2.dp, color = colorResource(R.color.yazirengi)),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = colorResource(R.color.gri)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (enabled) 
+                colorResource(R.color.gri)
+            else 
+                colorResource(R.color.gri).copy(alpha = 0.5f)
+        ),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -512,12 +626,6 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
         }
     }
 }
-
-
-
-
-
-
 
 @Composable
 fun EmptyGroupState(selectedTab : Int) {

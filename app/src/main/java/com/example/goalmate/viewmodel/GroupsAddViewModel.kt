@@ -753,6 +753,13 @@ class GroupsAddViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                // İnternet kontrolü
+                if (!isNetworkAvailable(context = db.app.applicationContext)) {
+                    _groupListState.value = GroupListState.Error("İnternet bağlantısı yok")
+                    isLoading = false
+                    return@launch
+                }
+
                 var query = db.collection("groups")
                     .orderBy("createdAt", Query.Direction.DESCENDING)
 
@@ -822,8 +829,7 @@ class GroupsAddViewModel @Inject constructor(
                 _groupListState.value = GroupListState.Success(currentGroups)
                 isLoading = false
             } catch (e: Exception) {
-                _groupListState.value =
-                    GroupListState.Error(e.message ?: "Bilinmeyen bir hata oluştu")
+                _groupListState.value = GroupListState.Error(e.message ?: "Bilinmeyen bir hata oluştu")
                 Log.e("GroupsAdd", "Error fetching groups", e)
                 isLoading = false
             }
@@ -1058,6 +1064,12 @@ class GroupsAddViewModel @Inject constructor(
     fun getUserGroups() {
         viewModelScope.launch {
             try {
+                // İnternet kontrolü
+                if (!isNetworkAvailable(context = db.app.applicationContext)) {
+                    _myGroups.value = emptyList()
+                    return@launch
+                }
+
                 val userId = auth.currentUser?.uid
                 if (userId != null) {
                     val userDoc = db.collection("users").document(userId).get().await()

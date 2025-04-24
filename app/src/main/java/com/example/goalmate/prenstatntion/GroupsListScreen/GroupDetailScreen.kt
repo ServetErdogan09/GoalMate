@@ -84,6 +84,51 @@ fun GroupDetailScreen(
     motivationQuoteViewModel: MotivationQuoteViewModel,
     registerViewModel: RegisterViewModel
 ) {
+    val context = LocalContext.current
+    var showNoInternetDialog by remember { mutableStateOf(false) }
+
+    // İnternet bağlantısını kontrol et
+    LaunchedEffect(Unit) {
+        if (!NetworkUtils.isNetworkAvailable(context)) {
+            showNoInternetDialog = true
+        }
+    }
+
+    // İnternet yok uyarı dialogu
+    if (showNoInternetDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                navController.popBackStack()
+            },
+            title = {
+                Text(
+                    text = "İnternet Bağlantısı Yok",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Gruplara erişmek için internet bağlantısı gereklidir. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        navController.popBackStack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(id = R.color.kutubordrengi)
+                    )
+                ) {
+                    Text("Tamam")
+                }
+            }
+        )
+        return
+    }
+
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
     val joinGroupState = groupsAddViewModel.joinGroupState.collectAsState().value
     val scope = rememberCoroutineScope()
@@ -91,7 +136,6 @@ fun GroupDetailScreen(
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     var showCloseGroupDialog by remember { mutableStateOf(false) }
     var showLeaveGroupDialog by remember { mutableStateOf(false) }
-    val content = LocalContext.current
 
     // Grup detaylarını yükle ve state'i temizle
     LaunchedEffect(groupId) {
@@ -104,9 +148,9 @@ fun GroupDetailScreen(
 
     // Kullanıcı grup üyesi ise showGroupChatScreen sayfasına yönlendirme yap
     LaunchedEffect(groupDetailState) {
-       // val currentTime = NetworkUtils.getTime(context = content)
+
        // val currentTime = System.currentTimeMillis() // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
-        val currentTime = NetworkUtils.getTime(content) // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
+        val currentTime = NetworkUtils.getTime(context) // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
         if (groupDetailState is GroupDetailState.Success && currentUserId != null) {
             val group = groupDetailState.group
             // Grup aktif VE kullanıcı üye ise yönlendir

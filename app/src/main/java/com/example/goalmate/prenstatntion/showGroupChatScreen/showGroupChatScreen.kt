@@ -130,6 +130,51 @@ fun ShowGroupChatScreen(
     navController: NavController,
     groupsAddViewModel: GroupsAddViewModel
 ){
+    val context = LocalContext.current
+    var showNoInternetDialog by remember { mutableStateOf(false) }
+
+    // İnternet bağlantısını kontrol et
+    LaunchedEffect(Unit) {
+        if (!NetworkUtils.isNetworkAvailable(context)) {
+            showNoInternetDialog = true
+        }
+    }
+
+    // İnternet yok uyarı dialogu
+    if (showNoInternetDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                navController.popBackStack()
+            },
+            title = {
+                Text(
+                    text = "İnternet Bağlantısı Yok",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Grup sohbetine erişmek için internet bağlantısı gereklidir. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        navController.popBackStack()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(id = R.color.kutubordrengi)
+                    )
+                ) {
+                    Text("Tamam")
+                }
+            }
+        )
+        return
+    }
+
     // Snackbar state'i
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -152,9 +197,6 @@ fun ShowGroupChatScreen(
 
     // Seçenekleri aç
     var expanded by remember { mutableStateOf(false) }
-
-
-    val context = LocalContext.current
 
     // Mesajları dinlemeye başla - Effect kullanımı
     LaunchedEffect(key1 = groupedId) {
