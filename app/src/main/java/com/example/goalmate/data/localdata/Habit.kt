@@ -101,7 +101,8 @@ data class RegistrationData(
     val birthDay: String = "",
     val birthMonth: String = "",
     val birthYear: String = "",
-    val maxAllowedGroups :Int = 3
+    val maxAllowedGroups :Int = 3,
+    val totalPoints: Int = 0,
 )
 
 // Geçmiş silindiğinde kullanıcılacak

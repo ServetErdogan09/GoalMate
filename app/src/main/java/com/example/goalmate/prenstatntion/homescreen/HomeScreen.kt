@@ -120,6 +120,7 @@ fun HomeScreen(
     }
 
     val userName by registerViewModel.userName.collectAsState()
+    val totalPoint = registerViewModel.totalPoint.collectAsState().value
     val profileImage by registerViewModel.profileImage.collectAsState()
 
     Log.e("userName","profileImage : $profileImage")
@@ -131,6 +132,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.getCountActiveHabit()
+        registerViewModel.getTotalPoint()
     }
 
     LaunchedEffect(totalHabits) {
@@ -476,7 +478,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
 
                                 Text(
-                                    text = "0",
+                                    text = "$totalPoint",
                                     color = colorResource(R.color.yazirengi),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp

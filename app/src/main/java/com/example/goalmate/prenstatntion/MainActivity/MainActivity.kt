@@ -365,7 +365,7 @@ fun ChangingScreen() {
                 )
             ) {backStackEntry->
                 val userId = backStackEntry.arguments?.getString("userId")?:""
-                ViewProfile(userId = userId, navController = navController, groupsAddViewModel = groupsAddViewModel)
+                ViewProfile(userId = userId, navController = navController, groupsAddViewModel = groupsAddViewModel ,registerViewModel)
             }
 
             composable(route = "allRequests") {

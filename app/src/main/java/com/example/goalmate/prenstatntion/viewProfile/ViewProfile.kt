@@ -48,6 +48,7 @@ import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.data.localdata.HabitFirebase
 import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.example.goalmate.viewmodel.GroupsAddViewModel
+import com.example.goalmate.viewmodel.RegisterViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
@@ -59,7 +60,8 @@ import java.util.Locale
 fun ViewProfile(
     userId: String,
     navController: NavController,
-    groupsAddViewModel: GroupsAddViewModel
+    groupsAddViewModel: GroupsAddViewModel,
+    registerViewModel: RegisterViewModel
 ) {
     // User data states
     val userNames = groupsAddViewModel.userNames.collectAsState().value
@@ -67,18 +69,20 @@ fun ViewProfile(
     val userName = userNames[userId] ?: "Yükleniyor..."
     val profileImage = profileImages[userId] ?: ""
 
+    val totalPoint = registerViewModel.totalPoint.collectAsState().value
+
     // State for user's groups
     var userGroups by remember { mutableStateOf<List<Group>>(emptyList()) }
     var userHabits by remember { mutableStateOf<List<HabitFirebase>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var joinDate by remember { mutableStateOf("01.01.2023") }
-    var coins by remember { mutableStateOf(250) }
     var selectedTab by remember { mutableStateOf(0) }
 
     // firestoreden verileri çek
     LaunchedEffect(userId) {
         groupsAddViewModel.getUsersName(userId)
         groupsAddViewModel.getProfile(userId)
+        registerViewModel.getTotalPoint()
 
         val db = FirebaseFirestore.getInstance()
 
@@ -282,8 +286,8 @@ fun ViewProfile(
                                                 .background(colorResource(id = R.color.kutubordrengi).copy(alpha = 0.2f))
                                         )
                                         StatItem(
-                                            value = coins.toString(),
-                                            label = "Coin",
+                                            value ="$totalPoint",
+                                            label = "Point",
                                             valueColor = colorResource(id = R.color.yildiz)
                                         )
                                     }

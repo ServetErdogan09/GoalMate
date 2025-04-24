@@ -54,6 +54,9 @@ class RegisterViewModel @Inject constructor(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
+    private val _totalPoint = MutableStateFlow<Int>(0)
+    val totalPoint : StateFlow<Int> = _totalPoint.asStateFlow()
+
     // Kayıt aşamasını takip etmek için
     private val _currentStep = MutableStateFlow(RegistrationStep.EMAIL_PASSWORD)
     val currentStep: StateFlow<RegistrationStep> = _currentStep.asStateFlow()
@@ -494,7 +497,8 @@ class RegisterViewModel @Inject constructor(
                                 "createdAt" to System.currentTimeMillis(),
                                 "joinedGroups" to listOf<String>(),
                                 "fcmToken" to fcmToken,
-                                "maxAllowedGroups" to 3
+                                "maxAllowedGroups" to 3 ,
+                                "totalPoints" to 0
                             )
 
                             // Ana kullanıcı dökümanını oluştur
@@ -826,6 +830,27 @@ class RegisterViewModel @Inject constructor(
         return canJoin
     }
 
+
+
+    // total puanı çek
+    fun  getTotalPoint(){
+        viewModelScope.launch {
+            try {
+                val userId = auth.currentUser?.uid?:return@launch
+                val totalPoint = db.collection("users")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                val point = totalPoint.getLong("totalPoints")!!.toInt()
+                _totalPoint.value = point
+            }catch (e:Exception){
+                Log.e("getTotalPoint","total point çekerken hata oluştu")
+            }
+        }
+    }
+
+
     // Kullanıcının grup sayılarını günceller
     suspend fun updateUserGroupCounts(userId: String) {
         try {
@@ -849,6 +874,10 @@ class RegisterViewModel @Inject constructor(
         }
     }
 }
+
+
+
+
 
 sealed class VerificationState {
     object Idle : VerificationState()
