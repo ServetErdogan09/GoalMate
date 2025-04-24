@@ -41,7 +41,11 @@ sealed class RequestsUiState {
 }
 
 
-
+sealed class MessagesState{
+    data class Success(val chatMessage: HashMap<String, Any>) : MessagesState()
+    data object Loading : MessagesState()
+    data class Error(val message: String) : MessagesState()
+}
 
 
 enum class RequestStatus {
@@ -50,11 +54,3 @@ enum class RequestStatus {
     REJECTED
 }
 
-
-// Yeni enum class ekleyelim
-enum class QuoteFetchState {
-    INITIAL,
-    LOADING,
-    SUCCESS,
-    ERROR
-}

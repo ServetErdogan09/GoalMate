@@ -5,10 +5,12 @@ import androidx.hilt.work.WorkerAssistedFactory
 import androidx.room.Room
 import androidx.work.WorkManager
 import com.example.goalmate.data.localdata.AppDatabase
+import com.example.goalmate.data.localdata.BadgesDao
 import com.example.goalmate.data.localdata.CompletedDayDao
 import com.example.goalmate.data.localdata.DaoHabits
 import com.example.goalmate.data.localdata.HabitHistoryDao
 import com.example.goalmate.data.localdata.UserPointsCoinDao
+import com.example.goalmate.data.repository.BadgesRepository
 import com.example.goalmate.data.repository.CompleteDayDaoRepository
 import com.example.goalmate.viewmodel.StarCoinViewModel
 import com.example.goalmate.data.repository.HabitRepository
@@ -55,6 +57,7 @@ object ExerciseModule {
     fun provideHabitHistoryDao(database: AppDatabase): HabitHistoryDao {
         return database.habitHistoryDao()
     }
+
 
     @Provides
     @Singleton
@@ -109,4 +112,22 @@ object ExerciseModule {
     fun provideStarCoinViewModel(starCoinRepository: StarCoinRepository): StarCoinViewModel {
         return StarCoinViewModel(starCoinRepository)
     }
+
+
+    //------------------------------------Badges----------------------------------------------------//
+
+    @Provides
+    @Singleton
+    fun provideBadgesDao(appDatabase: AppDatabase): BadgesDao{
+        return appDatabase.badgesDao()
+    }
+
+
+    @Provides
+    @Singleton
+    fun provideBadgesRepository(badgesDao: BadgesDao) : BadgesRepository{
+        return BadgesRepository(badgesDao)
+    }
 }
+
+

@@ -49,6 +49,7 @@ class GoalMateApplication : Application(), Configuration.Provider {
             .setWorkerFactory(workerFactory)
             .build()
 
+    // normal alışkanlık bildirim takibi
     private fun setupHabitNotificationWorker() {
         try {
             val constraints = Constraints.Builder()
@@ -58,18 +59,18 @@ class GoalMateApplication : Application(), Configuration.Provider {
                 .setRequiresDeviceIdle(false)
                 .build()
 
-           /* // Periyodik worker oluştur
+            // Periyodik worker oluştur
             val periodicWork = PeriodicWorkRequestBuilder<HabitsNotificationWorker>(
-                1, TimeUnit.HOURS, // Her saat kontrol et
+                3, TimeUnit.HOURS, // Her saat kontrol et
                 15, TimeUnit.MINUTES // 15 dakikalık esneklik payı
             )
 
-            */
-
+            /*
             val periodicWork = PeriodicWorkRequestBuilder<HabitsNotificationWorker>(
                 15, TimeUnit.MINUTES, // Her saat kontrol et
                 5, TimeUnit.MINUTES // 15 dakikalık esneklik payı
             )
+            */
                 .setConstraints(constraints)
                 .setInitialDelay(5, TimeUnit.MINUTES) // İlk çalışma için 5 dakika bekle
                 .setBackoffCriteria(
@@ -84,7 +85,7 @@ class GoalMateApplication : Application(), Configuration.Provider {
                 // Periyodik kontrolü başlat
                 enqueueUniquePeriodicWork(
                     "HabitNotifications",
-                    ExistingPeriodicWorkPolicy.KEEP, // Mevcut çalışan worker varsa onu koru
+                    ExistingPeriodicWorkPolicy.UPDATE, // Eskisini sil, yenisini koy
                     periodicWork
                 )
             }
@@ -139,6 +140,7 @@ class GoalMateApplication : Application(), Configuration.Provider {
         }
     }
 
+    // gurup için aktiflik duurmu
     private fun setupGroupStatusWorker() {
         try {
             // Hemen çalışacak bir OneTime worker oluştur
@@ -152,8 +154,8 @@ class GoalMateApplication : Application(), Configuration.Provider {
 
             // Periyodik worker oluştur (10 dakikada bir)
             val periodicCheck = PeriodicWorkRequestBuilder<GroupStatusWorker>(
-                15, TimeUnit.MINUTES, // Her 3 SAAT bir kontrol
-                5, TimeUnit.MINUTES  // 30 dakika esneklik payı
+                3, TimeUnit.MINUTES, // Her 3 SAAT bir kontrol
+                30, TimeUnit.MINUTES  // 30 dakika esneklik payı
             )
                 .setConstraints(
                     Constraints.Builder()
@@ -181,6 +183,9 @@ class GoalMateApplication : Application(), Configuration.Provider {
         }
     }
 
+
+
+// kalan gün sayısı 1 olduğunda gece yarısı çalışıp gurubu kapatacak
     private fun setupExpireGroupWorker() {
         try {
             val constraints = Constraints.Builder()

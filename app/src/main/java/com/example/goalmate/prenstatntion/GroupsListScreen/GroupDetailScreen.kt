@@ -1,6 +1,8 @@
 package com.example.goalmate.prenstatntion.GroupsListScreen
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,21 +55,30 @@ import androidx.compose.ui.text.style.TextAlign
 import coil.compose.rememberAsyncImagePainter
 import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import com.example.goalmate.prenstatntion.AnalysisScreen.totalHabit
+import com.example.goalmate.utils.NetworkUtils
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 import com.example.goalmate.viewmodel.RegisterViewModel
+import kotlinx.coroutines.delay
+import java.util.concurrent.TimeUnit
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun GroupDetailScreen(
     groupId: String,
+    groupName : String,
     navController: NavController,
     groupsAddViewModel: GroupsAddViewModel,
     motivationQuoteViewModel: MotivationQuoteViewModel,
@@ -78,32 +89,49 @@ fun GroupDetailScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    var showCloseGroupDialog by remember { mutableStateOf(false) }
+    var showLeaveGroupDialog by remember { mutableStateOf(false) }
+    val content = LocalContext.current
+
+    // Grup detaylarını yükle ve state'i temizle
+    LaunchedEffect(groupId) {
+        // Önce state'i temizle
+        groupsAddViewModel.resetJoinGroupState()
+        // Sonra grup detaylarını yükle
+        groupsAddViewModel.getGroupById(groupId)
+    }
+
 
     // Kullanıcı grup üyesi ise showGroupChatScreen sayfasına yönlendirme yap
     LaunchedEffect(groupDetailState) {
+       // val currentTime = NetworkUtils.getTime(context = content)
+       // val currentTime = System.currentTimeMillis() // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
+        val currentTime = NetworkUtils.getTime(content) // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
         if (groupDetailState is GroupDetailState.Success && currentUserId != null) {
-            if (groupDetailState.group.members.contains(currentUserId)) {
-                navController.navigate("showGroupChatScreen") {
-                    navController.popBackStack()
-                   // popUpTo("GroupDetailScreen/${groupId}") { inclusive = true }
-                }
-                return@LaunchedEffect
+            val group = groupDetailState.group
+            // Grup aktif VE kullanıcı üye ise yönlendir
+            if (group.groupStatus == "ACTIVE" && group.members.contains(currentUserId)) {
+                // State'in tamamen güncellenmesi için biraz bekle
+                delay(300)
+
+                val members = group.members.size
+
+                val daysLeft = remainingDays(group = group , currentTime = currentTime)
+                Log.e("members","$daysLeft kalan gün saysıı")
+
+
+                //  grouptan gönderebilirz kalan gün sayısını ve toplam katılımcı sayısını navigation ile diğer ekrana parametre olarka gönderebilriiz
+                navController.navigate("showGroupChatScreen/${groupId}/${groupName}/${members}/${daysLeft}/${group.frequency}")
             }
         }
     }
 
-
-
     DisposableEffect(Unit) {
         onDispose {
-            snackbarHostState.currentSnackbarData?.dismiss() // Sayfadan çıkarken Snackbar'ı kapat
-            Log.e("girdi","girdi")
+            // Sayfadan çıkarken tüm state'leri temizle
+            snackbarHostState.currentSnackbarData?.dismiss()
+            groupsAddViewModel.resetJoinGroupState()
         }
-    }
-
-    // Grup detaylarını yükle
-    LaunchedEffect(groupId) {
-        groupsAddViewModel.getGroupById(groupId)
     }
 
     LaunchedEffect(joinGroupState) {
@@ -140,7 +168,7 @@ fun GroupDetailScreen(
                         tint = colorResource(R.color.yazirengi)
                     )
                 }
-                
+
                 Text(
                     text = "Grup Detayları",
                     modifier = Modifier.align(Alignment.Center),
@@ -169,10 +197,12 @@ fun GroupDetailScreen(
                             )
                         }
                     }
-                    
+
                     is GroupDetailState.Success -> {
                         val group = groupDetailState.group
+                        val groupCode = group.groupCode
                         val isUserMember = group.members.contains(currentUserId)
+                        val isGroupAdmin = currentUserId == group.createdBy
 
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
@@ -180,6 +210,10 @@ fun GroupDetailScreen(
                         ) {
                             item {
                                 GroupHeaderSection(group)
+                            }
+
+                            item {
+                                GroupStatusSection(group, groupsAddViewModel)
                             }
 
                             if (!group.isPrivate || isUserMember) {
@@ -191,7 +225,7 @@ fun GroupDetailScreen(
                                         icon = R.drawable.talk
                                     )
                                 }
-                                
+
                                 item {
                                     GroupInfoCard(
                                         title = "Motivasyon",
@@ -199,24 +233,34 @@ fun GroupDetailScreen(
                                         icon = R.drawable.book
                                     )
                                 }
-                                
+
                                 item {
                                     GroupScheduleCard(
                                         frequency = group.frequency,
                                         duration = group.habitDuration
                                     )
                                 }
-                                
+
                                 item {
                                     ParticipantsSection(
                                         members = group.members,
                                         groupsAddViewModel = groupsAddViewModel,
                                         showOnlyLeader = false,
                                         groupLeaderId = group.createdBy,
-                                        showJoinButton = true,
                                         navController = navController,
-                                        registerViewModel =registerViewModel
+                                        groupCode = groupCode
                                     )
+                                }
+
+                                // Grup Yönetimi Butonları
+                                if (isUserMember) {
+                                    item {
+                                        GroupManagementButtons(
+                                            isGroupAdmin = isGroupAdmin,
+                                            onLeaveClick = { showLeaveGroupDialog = true },
+                                            onCloseClick = { showCloseGroupDialog = true }
+                                        )
+                                    }
                                 }
                             } else {
                                 // Özel grup ve üye değil
@@ -245,15 +289,14 @@ fun GroupDetailScreen(
                                         groupsAddViewModel = groupsAddViewModel,
                                         showOnlyLeader = true,
                                         groupLeaderId = group.createdBy,
-                                        showJoinButton = true,
+                                        groupCode = groupCode,
                                         navController = navController,
-                                        registerViewModel = registerViewModel
                                     )
                                 }
                             }
                         }
                     }
-                    
+
                     is GroupDetailState.Error -> {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -270,6 +313,70 @@ fun GroupDetailScreen(
             }
         }
     }
+
+    // Grup kapatma onay dialog'u
+    if (showCloseGroupDialog) {
+        AlertDialog(
+            onDismissRequest = { showCloseGroupDialog = false },
+            title = { Text("Grubu Kapat") },
+            text = { Text("Bu grubu kapatmak istediğinizden emin misiniz? Bu işlem geri alınamaz.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            groupsAddViewModel.closeGroup(groupId)
+                            showCloseGroupDialog = false
+                            navController.popBackStack()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.pastelkirmizi)
+                    )
+                ) {
+                    Text("Grubu Kapat")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCloseGroupDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
+
+    // Gruptan ayrılma onay dialog'u
+    if (showLeaveGroupDialog) {
+        AlertDialog(
+            onDismissRequest = { showLeaveGroupDialog = false },
+            title = { Text("Gruptan Ayrıl") },
+            text = { Text("Bu gruptan ayrılmak istediğinizden emin misiniz?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            groupsAddViewModel.leaveGroup(groupId)
+                            showLeaveGroupDialog = false
+                            // Verilerin güncellenmesi için kısa bir gecikme ekle
+                            kotlinx.coroutines.delay(500)
+                            navController.navigate("groupListScreen") {
+                                popUpTo("groupListScreen") { inclusive = true }
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.pastelkirmizi)
+                    )
+                ) {
+                    Text("Ayrıl")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLeaveGroupDialog = false }) {
+                    Text("İptal")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -277,7 +384,7 @@ fun GroupHeaderSection(group: Group) {
     // Debug log ekleyelim
     LaunchedEffect(Unit) {
         Log.d("GroupDetailScreen", "Group Details:")
-        Log.d("GroupDetailScreen", "isPrivate: ${group.isPrivate}")
+        Log.d("GroupDetailScreen", "private: ${group.isPrivate}")
         Log.d("GroupDetailScreen", "participationType: ${group.participationType}")
         Log.d("GroupDetailScreen", "groupName: ${group.groupName}")
     }
@@ -294,18 +401,18 @@ fun GroupHeaderSection(group: Group) {
             color = colorResource(R.color.yazirengi),
             fontWeight = FontWeight.Bold
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         Row(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = if (group.isPrivate) 
+                    containerColor = if (group.isPrivate)
                         colorResource(R.color.kirmizi).copy(alpha = 0.1f)
-                    else 
+                    else
                         colorResource(R.color.yesil2).copy(alpha = 0.2f)
                 ),
                 shape = RoundedCornerShape(50)
@@ -321,9 +428,9 @@ fun GroupHeaderSection(group: Group) {
                         ),
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
-                        tint = if (group.isPrivate) 
+                        tint = if (group.isPrivate)
                             colorResource(R.color.pastelkirmizi)
-                        else 
+                        else
                             colorResource(R.color.yesil2)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
@@ -335,9 +442,9 @@ fun GroupHeaderSection(group: Group) {
                             Log.d("GroupDetailScreen", "Displaying as Open Group")
                             "Açık - ${group.category}"
                         },
-                        color = if (group.isPrivate) 
+                        color = if (group.isPrivate)
                             colorResource(R.color.pastelkirmizi)
-                        else 
+                        else
                             colorResource(R.color.yesil2),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -370,16 +477,16 @@ fun GroupInfoCard(title: String, content: String, icon: Int) {
                     tint = colorResource(R.color.kutubordrengi),
                     modifier = Modifier.size(24.dp)
                 )
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     color = colorResource(R.color.yazirengi)
                 )
             }
-            
+
             Text(
                 text = content,
                 style = MaterialTheme.typography.bodyMedium,
@@ -412,24 +519,24 @@ fun GroupScheduleCard(frequency: String, duration: String) {
                     tint = colorResource(R.color.kutubordrengi),
                     modifier = Modifier.size(24.dp)
                 )
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 Text(
                     text = "Alışkanlık Programı",
                     style = MaterialTheme.typography.titleMedium,
                     color = colorResource(R.color.yazirengi)
                 )
             }
-            
+
             Text(
                 text = "Sıklık: $frequency",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colorResource(R.color.yazirengi)
             )
-            
+
             Spacer(modifier = Modifier.height(4.dp))
-            
+
             Text(
                 text = "Süre: ${formatDuration(duration)}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -454,17 +561,17 @@ private fun formatDuration(duration: String): String {
 fun ParticipantsSection(
     members: List<String>,
     groupsAddViewModel: GroupsAddViewModel,
-    registerViewModel: RegisterViewModel,
     showOnlyLeader: Boolean,
+    groupCode : String,
     groupLeaderId: String,
-    showJoinButton: Boolean,
-    db: FirebaseFirestore = FirebaseFirestore.getInstance(),
     navController: NavController
 ) {
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
     val group = (groupDetailState as? GroupDetailState.Success)?.group
     val isUserMember = group?.members?.contains(currentUserId) ?: false
+    val scope = rememberCoroutineScope()
+
 
     Card(
         modifier = Modifier
@@ -487,16 +594,16 @@ fun ParticipantsSection(
                     tint = colorResource(R.color.kutubordrengi),
                     modifier = Modifier.size(24.dp)
                 )
-                
+
                 Spacer(modifier = Modifier.width(8.dp))
-                
+
                 Text(
                     text = if (showOnlyLeader) "Grup Lideri" else "Katılımcılar (${members.size})",
                     style = MaterialTheme.typography.titleMedium,
                     color = colorResource(R.color.yazirengi)
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
 
             if (showOnlyLeader) {
@@ -509,12 +616,43 @@ fun ParticipantsSection(
             }
 
             // Her durumda katıl butonunu göster, ama üye ise deaktif olsun
-            if (!isUserMember) {
+            if (!isUserMember && group != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 JoinGroupButton(
-                    db = db,
-                    groupsAddViewModel = groupsAddViewModel,
-                    registerViewModel = registerViewModel
+                    group = group,
+                    onJoinClick = {
+                        scope.launch {
+                            currentUserId?.let { userId ->
+                                group.groupId.let { groupId ->
+                                    groupsAddViewModel.requestJoinGroup(
+                                        groupId = groupId,
+                                        userId = userId,
+                                        joinCode = groupCode,
+                                        participantNumber = group.muxParticipationCount,
+                                        members = group.members
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    onRequestJoinClick = {
+                        scope.launch {
+                            currentUserId?.let { userId ->
+                                group.groupId.let { groupId ->
+                                    groupsAddViewModel.requestJoinGroup(
+                                        groupId = groupId,
+                                        userId = userId,
+                                        joinCode = null,
+                                        participantNumber = group.muxParticipationCount,
+                                        members = group.members
+                                    )
+                                }
+                            }
+                        }
+                    },
+                    isUserInGroup = isUserMember,
+                    isRequestPending = false,
+                    isGroupFull = group.members.size >= group.muxParticipationCount
                 )
             }
         }
@@ -527,7 +665,7 @@ fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel, na
     val profileImages = groupsAddViewModel.profileImages.collectAsState().value
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
     val group = (groupDetailState as? GroupDetailState.Success)?.group
-    
+
     val userName = userNames[memberId] ?: "Yükleniyor..."
     val profileImage = profileImages[memberId] ?: ""
     val isGroupLeader = group?.createdBy == memberId
@@ -574,7 +712,7 @@ fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel, na
                     Log.e("ViewProfile","kullanıcı ıd : $memberId")
                 }
         )
-        
+
         Spacer(modifier = Modifier.width(12.dp))
 
         Column {
@@ -617,139 +755,82 @@ fun ParticipantItem(memberId: String, groupsAddViewModel: GroupsAddViewModel, na
 
 @Composable
 fun JoinGroupButton(
-    db: FirebaseFirestore,
-    groupsAddViewModel: GroupsAddViewModel,
-    registerViewModel: RegisterViewModel
+    group: Group,
+    onJoinClick: () -> Unit,
+    onRequestJoinClick: () -> Unit,
+    isUserInGroup: Boolean,
+    isRequestPending: Boolean,
+    isGroupFull: Boolean
 ) {
-    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
-    val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
+    val maxParticipants = group.muxParticipationCount
+    val currentParticipants = group.members.size
+    val isFull = currentParticipants >= maxParticipants
+    var showJoinPrivateGroupDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val joinedGroupsCount = registerViewModel.joinedGroupsCount.collectAsState().value
-    val maxAllowedGroups = registerViewModel.maxAllowedGroups.collectAsState().value
-    
-    var showJoinDialog by remember { mutableStateOf(false) }
-    var showMaxGroupsDialog by remember { mutableStateOf(false) }
-    
-    if (currentUserId != null && groupDetailState is GroupDetailState.Success) {
-        val group = groupDetailState.group
-        val isUserInGroup = group.members.contains(currentUserId)
-        val isGroupFull = group.members.size >= group.participantNumber
-        val hasReachedGroupLimit = joinedGroupsCount >= maxAllowedGroups
-        
-        if (showMaxGroupsDialog) {
-            AlertDialog(
-                onDismissRequest = { showMaxGroupsDialog = false },
-                title = {
-                    Text(
-                        text = "Grup Limiti",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = colorResource(id = R.color.yazirengi)
-                    )
-                },
-                text = {
-                    Text(
-                        text = "Maksimum katılabileceğiniz grup sayısına ulaştınız ($maxAllowedGroups). Yeni bir gruba katılmak için önce başka bir gruptan ayrılmalısınız.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colorResource(id = R.color.yazirengi)
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { showMaxGroupsDialog = false }) {
-                        Text("Tamam")
+    val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val isGroupActive = group.groupStatus == "ACTIVE"
+
+    Button(
+        onClick = {
+            if (isFull || isGroupActive) {
+                return@Button
+            }
+            if (group.isPrivate) {
+                showJoinPrivateGroupDialog = true
+            } else {
+                // Açık grup - direkt katılım
+                scope.launch {
+                    currentUserId?.let { userId ->
+                        group.groupId.let { groupId ->
+                            onJoinClick()
+                        }
                     }
                 }
-            )
-        }
-        
-        Button(
-            onClick = { 
-                if (!isUserInGroup && !isGroupFull) {
-                    if (hasReachedGroupLimit) {
-                        showMaxGroupsDialog = true
-                    } else {
-                        if (group.isPrivate) {
-                            showJoinDialog = true
-                        } else {
-                            // Açık grup için direkt katılım
-                            scope.launch {
-                                groupsAddViewModel.requestJoinGroup(
-                                    groupId = group.groupId,
-                                    userId = currentUserId,
-                                    joinCode = null,
-                                    participantNumber = group.participantNumber,
-                                    members = group.members
-                                )
+            }
+        },
+        enabled = !isUserInGroup && !isRequestPending && !isFull && !isGroupActive,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = when {
+                isGroupActive -> Color.Gray
+                isFull -> Color.Gray
+                else -> colorResource(R.color.kutubordrengi)
+            }
+        )
+    ) {
+        Text(
+            text = when {
+                isUserInGroup -> "Gruptasınız"
+                isRequestPending -> "Katılım İsteği Gönderildi"
+                isGroupActive -> "Grup Aktif - Katılım Kapalı"
+                isFull -> "Grup Dolu ($currentParticipants/$maxParticipants)"
+                group.isPrivate -> "Gruba Katıl"
+                else -> "Gruba Katıl"
+            }
+        )
+    }
+
+    if (showJoinPrivateGroupDialog) {
+        JoinPrivateGroupDialog(
+            group = group,
+            onDismiss = { showJoinPrivateGroupDialog = false },
+            onJoinRequest = { joinCode ->
+                scope.launch {
+                    currentUserId?.let { userId ->
+                        group.groupId.let { groupId ->
+                            if (!joinCode.isNullOrEmpty()) {
+                                // Kod ile katılım - direkt katılım
+                                onJoinClick()
+                            } else {
+                                // Kod olmadan katılım - istek gönderme
+                                onRequestJoinClick()
                             }
                         }
                     }
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = when {
-                    isUserInGroup -> colorResource(R.color.gri)
-                    isGroupFull -> colorResource(R.color.gri)
-                    hasReachedGroupLimit -> colorResource(R.color.pastelkirmizi)
-                    else -> colorResource(R.color.kutubordrengi)
-                }
-            ),
-            shape = RoundedCornerShape(24.dp),
-            enabled = !isUserInGroup && !isGroupFull
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    painter = when {
-                        isUserInGroup -> painterResource(R.drawable.ic_personal_info)
-                        isGroupFull -> painterResource(R.drawable.close)
-                        hasReachedGroupLimit -> painterResource(R.drawable.close)
-                        else -> painterResource(R.drawable.ic_personal_info)
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = when {
-                        hasReachedGroupLimit -> colorResource(R.color.beyaz)
-                        isGroupFull -> colorResource(R.color.pastelkirmizi)
-                        else -> colorResource(R.color.beyaz)
-                    }
-                )
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Text(
-                    text = when {
-                        isUserInGroup -> "Zaten Katıldınız"
-                        isGroupFull -> "✨ Grup Şu An Dolu! (${group.members.size}/${group.participantNumber})"
-                        hasReachedGroupLimit -> "Grup Limitine Ulaştınız ($joinedGroupsCount/$maxAllowedGroups)"
-                        else -> if (group.isPrivate) "Gruba Katıl" else "Gruba Katıl"
-                    },
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = when {
-                            isGroupFull -> colorResource(R.color.pastelkirmizi)
-                            else -> colorResource(R.color.beyaz)
-                        }
-                    )
-                )
+                showJoinPrivateGroupDialog = false
             }
-        }
-
-        if (showJoinDialog && !isGroupFull && !hasReachedGroupLimit && group.isPrivate) {
-            JoinPrivateGroupDialog(
-                group = group,
-                onDismiss = { showJoinDialog = false },
-                onJoinRequest = { code ->
-                    scope.launch {
-                        groupsAddViewModel.requestJoinGroup(group.groupId, currentUserId, code, group.participantNumber, group.members)
-                    }
-                    showJoinDialog = false
-                }
-            )
-        }
+        )
     }
 }
 
@@ -789,9 +870,12 @@ fun JoinPrivateGroupDialog(
                     SelectableOption(
                         text = "Katılım İsteği Gönder",
                         selected = selectedOption == JoinOption.REQUEST,
-                        onClick = { selectedOption = JoinOption.REQUEST }
+                        onClick = { 
+                            selectedOption = JoinOption.REQUEST
+                            joinCode = "" // İstek seçildiğinde kodu temizle
+                        }
                     )
-                    
+
                     SelectableOption(
                         text = "Katılım Kodu Gir",
                         selected = selectedOption == JoinOption.CODE,
@@ -820,11 +904,17 @@ fun JoinPrivateGroupDialog(
                         null -> onDismiss()
                     }
                 },
-                enabled = selectedOption != null && 
-                         (selectedOption == JoinOption.REQUEST || 
+                enabled = selectedOption != null &&
+                         (selectedOption == JoinOption.REQUEST ||
                           (selectedOption == JoinOption.CODE && joinCode.isNotEmpty()))
             ) {
-                Text("Katıl")
+                Text(
+                    text = when (selectedOption) {
+                        JoinOption.REQUEST -> "İstek Gönder"
+                        JoinOption.CODE -> "Katıl"
+                        null -> "İptal"
+                    }
+                )
             }
         },
         dismissButton = {
@@ -846,14 +936,14 @@ private fun SelectableOption(
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(
-                if (selected) 
+                if (selected)
                     colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
-                else 
+                else
                     Color.Transparent
             )
             .clickable(
                 onClick = onClick)
-            
+
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -894,17 +984,17 @@ fun PrivateGroupInfo() {
                 tint = colorResource(R.color.kutubordrengi),
                 modifier = Modifier.size(48.dp)
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             Text(
                 text = "Bu özel bir grup",
                 style = MaterialTheme.typography.titleMedium,
                 color = colorResource(R.color.yazirengi)
             )
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = "Grup detaylarını görmek için gruba katılmanız gerekmektedir.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -912,5 +1002,332 @@ fun PrivateGroupInfo() {
                 textAlign = TextAlign.Center
             )
         }
+    }
+}
+
+@Composable
+fun GroupManagementButtons(
+    isGroupAdmin: Boolean,
+    onLeaveClick: () -> Unit,
+    onCloseClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = colorResource(R.color.gri)),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Grup Yönetimi",
+                style = MaterialTheme.typography.titleMedium,
+                color = colorResource(R.color.yazirengi)
+            )
+            if (isGroupAdmin) {
+                Button(
+                    onClick = onCloseClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.pastelkirmizi)
+                    )
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.close),
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Text("Grubu Kapat")
+                    }
+                }
+            } else {
+                Button(
+                    onClick = onLeaveClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(R.color.kutubordrengi)
+                    )
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.back),
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Text("Gruptan Ayrıl")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun GroupStatusSection(group: Group, viewModel: GroupsAddViewModel) {
+    var remainingTime by remember { mutableStateOf<Long>(0) }
+    var daysLeft by remember { mutableStateOf(0L) }
+    var hoursLeft by remember { mutableStateOf(0L) }
+    var minutesLeft by remember { mutableStateOf(0L) }
+    var isTimeExpired by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(group) {
+        while (true) {
+            val currentTime = NetworkUtils.getTime(context)
+            val deadline = group.startDeadline
+            val timeUntilDeadline = deadline - currentTime
+
+            when (group.groupStatus) {
+                "WAITING" -> {
+                    if (timeUntilDeadline > 0) {
+                        isTimeExpired = false
+                        remainingTime = timeUntilDeadline
+                        daysLeft = TimeUnit.MILLISECONDS.toDays(remainingTime)
+                        val remainingHours = remainingTime - TimeUnit.DAYS.toMillis(daysLeft)
+                        hoursLeft = TimeUnit.MILLISECONDS.toHours(remainingHours)
+                        val remainingMinutes = remainingHours - TimeUnit.HOURS.toMillis(hoursLeft)
+                        minutesLeft = TimeUnit.MILLISECONDS.toMinutes(remainingMinutes)
+                    } else {
+                        isTimeExpired = true
+                        daysLeft = 0
+                        hoursLeft = 0
+                        minutesLeft = 0
+                    }
+                }
+                "ACTIVE" -> {
+                    isTimeExpired = false
+                    val startDate = group.actualStartDate ?: currentTime
+                    val activeTime = currentTime - startDate
+                    daysLeft = TimeUnit.MILLISECONDS.toDays(activeTime)
+
+                }
+            }
+            delay(1000) // Her saniye güncelle
+        }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                isTimeExpired && group.groupStatus == "WAITING" -> colorResource(R.color.pastelkirmizi).copy(alpha = 0.1f)
+                group.groupStatus == "WAITING" -> colorResource(R.color.gri)
+                group.groupStatus == "ACTIVE" -> colorResource(R.color.yesil2).copy(alpha = 0.1f)
+                group.groupStatus == "EXPIRED" -> colorResource(R.color.pastelkirmizi).copy(alpha = 0.1f)
+                group.groupStatus == "CLOSED" -> colorResource(R.color.pastelkirmizi).copy(alpha = 0.1f)
+                else -> colorResource(R.color.gri)
+            }
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(
+                                when {
+                                    isTimeExpired && group.groupStatus == "WAITING" -> R.drawable.close
+                                    group.groupStatus == "WAITING" -> R.drawable.zaman
+                                    group.groupStatus == "ACTIVE" -> R.drawable.open
+                                    else -> R.drawable.close
+                                }
+                            ),
+                            contentDescription = null,
+                            tint = when {
+                                isTimeExpired && group.groupStatus == "WAITING" -> colorResource(R.color.pastelkirmizi)
+                                group.groupStatus == "WAITING" -> colorResource(R.color.kutubordrengi)
+                                group.groupStatus == "ACTIVE" -> colorResource(R.color.yesil2)
+                                else -> colorResource(R.color.pastelkirmizi)
+                            },
+                            modifier = Modifier.size(24.dp)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Column {
+                            Text(
+                                text = when {
+                                    isTimeExpired && group.groupStatus == "WAITING" -> "Süre Doldu"
+                                    group.groupStatus == "WAITING" -> "Başlamayı Bekliyor"
+                                    group.groupStatus == "ACTIVE" -> "Aktif"
+                                    group.groupStatus == "EXPIRED" -> "Süre Doldu"
+                                    group.groupStatus == "CLOSED" -> "Kapalı"
+                                    else -> ""
+                                },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = when {
+                                    isTimeExpired && group.groupStatus == "WAITING" -> colorResource(R.color.pastelkirmizi)
+                                    group.groupStatus == "WAITING" -> colorResource(R.color.kutubordrengi)
+                                    group.groupStatus == "ACTIVE" -> colorResource(R.color.yesil2)
+                                    else -> colorResource(R.color.pastelkirmizi)
+                                }
+                            )
+                            if (isTimeExpired && group.groupStatus == "WAITING") {
+                                Text(
+                                    text = "İşlem Bekleniyor",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colorResource(R.color.pastelkirmizi)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Katılımcı Sayısı
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_personal_info),
+                        contentDescription = null,
+                        tint = when {
+                            group.members.size >= group.muxParticipationCount -> colorResource(R.color.yesil2)
+                            group.members.size >= group.minParticipationCount -> colorResource(R.color.kutubordrengi)
+                            else -> colorResource(R.color.pastelkirmizi)
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${group.members.size}/${group.muxParticipationCount}\n(min: ${group.minParticipationCount})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(R.color.yazirengi),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            if (group.groupStatus != "CLOSED" && group.groupStatus != "EXPIRED") {
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (isTimeExpired && group.groupStatus == "WAITING") {
+                    Text(
+                        text = "Grup durumu güncelleniyor...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(R.color.pastelkirmizi),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (group.groupStatus == "WAITING") {
+                            TimeUnit(value = daysLeft, unit = "Gün")
+                            Text(
+                                text = ":",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colorResource(R.color.kutubordrengi),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            TimeUnit(value = hoursLeft, unit = "Saat")
+                            Text(
+                                text = ":",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colorResource(R.color.kutubordrengi),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            TimeUnit(value = minutesLeft, unit = "Dk")
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+private fun remainingDays(group: Group, currentTime: Long): Long {
+    val startDate = group.actualStartDate ?: currentTime
+    Log.e("members", "$startDate başlama tarihi")
+    val frequency = group.frequency
+
+    // Başlangıç tarihini sıfırla (saat, dakika, saniye sıfırlansın)
+    val startCalendar = java.util.Calendar.getInstance().apply {
+        timeInMillis = startDate
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }
+
+    // Şu anki tarihi sıfırla
+    val currentCalendar = java.util.Calendar.getInstance().apply {
+        timeInMillis = currentTime
+        set(java.util.Calendar.HOUR_OF_DAY, 0)
+        set(java.util.Calendar.MINUTE, 0)
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }
+
+    // Toplam gün sayısını hesapla
+    val totalDays = totalHabit(frequency)
+
+    // İki tarih arasındaki farkı gün cinsinden hesapla
+    val diffInMillis = currentCalendar.timeInMillis - startCalendar.timeInMillis
+    val daysBetween = (diffInMillis / (24 * 60 * 60 * 1000)).toInt()
+
+    Log.e("members", "Başlangıç tarihi: ${startCalendar.time}")
+    Log.e("members", "Şu anki tarih: ${currentCalendar.time}")
+    Log.e("members", "Gün farkı: $daysBetween")
+    Log.e("members", "Toplam gün: $totalDays")
+
+    // Eğer geçen gün sayısı toplam günden fazlaysa 0 döndür
+    if (daysBetween >= totalDays) {
+        return 0L
+    }
+
+    // Kalan gün sayısını hesapla
+    val remainingDays = (totalDays - daysBetween).toLong()
+    Log.e("members", "Kalan gün: $remainingDays")
+
+    return remainingDays
+}
+
+@Composable
+private fun TimeUnit(value: Long, unit: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    ) {
+        Text(
+            text = String.format("%02d", value),
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = colorResource(R.color.kutubordrengi)
+        )
+        Text(
+            text = unit,
+            style = MaterialTheme.typography.bodySmall,
+            color = colorResource(R.color.yazirengi)
+        )
     }
 }

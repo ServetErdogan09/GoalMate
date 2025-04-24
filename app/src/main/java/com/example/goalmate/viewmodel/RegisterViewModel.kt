@@ -38,6 +38,8 @@ import kotlinx.coroutines.delay
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.example.goalmate.data.localdata.Group
+import com.example.goalmate.data.localdata.GroupHabitStats
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.SupervisorJob
 
 @HiltViewModel
@@ -67,7 +69,7 @@ class RegisterViewModel @Inject constructor(
     val profileImage: StateFlow<String> = _profileImage.asStateFlow()
 
 
-    private val _maxAllowedGroups  = MutableStateFlow<Int>(3)
+    private val _maxAllowedGroups  = MutableStateFlow<Int>(2)
     val maxAllowedGroups : StateFlow<Int> = _maxAllowedGroups.asStateFlow()
 
 
@@ -451,7 +453,6 @@ class RegisterViewModel @Inject constructor(
 
             }
     }
-
     fun saveUserToFirestore(userId: String, context: Context) {
         viewModelScope.launch {
             try {
@@ -464,7 +465,7 @@ class RegisterViewModel @Inject constructor(
 
                 Log.d("RegisterViewModel", "Current user ID: ${auth.currentUser?.uid}")
                 Log.d("RegisterViewModel", "Saving data for user ID: $userId")
-                
+
                 // SharedPreferences'dan kayıt verilerini al
                 val savedData = getRegistrationDataFromPrefs(context)
                 Log.d("RegisterViewModel", "Retrieved saved data: $savedData")
@@ -473,70 +474,81 @@ class RegisterViewModel @Inject constructor(
                 val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
                 val profileImage = sharedPreferences.getString("profileImage", "") ?: ""
 
-                 FirebaseMessaging.getInstance().token.addOnCompleteListener {task ->
-                    if (task.isSuccessful){
-                        val  fcmToken = task.result
+                FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val fcmToken = task.result
 
-                        // Kullanıcı verilerini hazırla
-                        val userData = hashMapOf(
-                            "email" to savedData.email,
-                            "name" to savedData.name,
-                            "surname" to savedData.surname,
-                            "gender" to savedData.gender,
-                            "birthDate" to "${savedData.birthDay}/${savedData.birthMonth}/${savedData.birthYear}",
-                            "profileImage" to profileImage,
-                            "isEmailVerified" to true,
-                            "createdAt" to System.currentTimeMillis(),
-                            "updatedAt" to System.currentTimeMillis(),
-                            "joinedGroups" to listOf<String>(),
-                            "fcmToken" to fcmToken,
-                            "maxAllowedGroups" to 3 // başlangıç olarka 3 guruba katılabilecek
-                        )
+                        // Transaction başlat
+                        db.runTransaction { transaction ->
+                            val userRef = db.collection("users").document(userId)
 
-                        Log.d("RegisterViewModel", "Prepared user data: $userData")
+                            // Ana kullanıcı verilerini hazırla
+                            val userData = hashMapOf(
+                                "email" to savedData.email,
+                                "name" to savedData.name,
+                                "surname" to savedData.surname,
+                                "gender" to savedData.gender,
+                                "birthDate" to "${savedData.birthDay}/${savedData.birthMonth}/${savedData.birthYear}",
+                                "profileImage" to profileImage,
+                                "isEmailVerified" to true,
+                                "createdAt" to System.currentTimeMillis(),
+                                "joinedGroups" to listOf<String>(),
+                                "fcmToken" to fcmToken,
+                                "maxAllowedGroups" to 3
+                            )
 
+                            // Ana kullanıcı dökümanını oluştur
+                            transaction.set(userRef, userData)
 
-                        db.collection("users")
-                            .document(userId)
-                            .set(userData)
-                            .addOnSuccessListener {
-                                Log.d("RegisterViewModel", "User data saved successfully")
+                            // GroupHabitStats alt koleksiyonunu oluştur
+                            val statsRef = userRef.collection("stats").document("habitStats")
+                            transaction.set(statsRef, GroupHabitStats(
+                                dailyGroupsCompleted = 0,
+                                weeklyGroupsCompleted = 0,
+                                monthlyGroupsCompleted = 0
+                            ))
+
+                            // BadgesId alt koleksiyonunu oluştur
+                            val badgesRef = userRef.collection("badges").document("earnedBadges")
+                            transaction.set(badgesRef, hashMapOf(
+                                "badgeIds" to listOf<Int>()
+                            ))
+
+                        }.addOnSuccessListener {
+                            Log.d("RegisterViewModel", "User data and subcollections saved successfully")
+
+                            viewModelScope.launch {
+                                try {
+                                    // Auth profilini güncelle
+                                    auth.currentUser?.updateProfile(userProfileChangeRequest {
+                                        displayName = savedData.name
+                                    })?.await()
+
+                                    Log.d("RegisterViewModel", "Updated Auth display name")
+
+                                    // StateFlow'u güncelle
+                                    _userName.value = savedData.name
+
+                                    // SharedPreferences'ı temizle
+                                    clearRegistrationDataFromPrefs(context)
+
+                                    // ProfileScreen'e yönlendir
+                                    _authState.value = AuthState.ProfileRequired
+
+                                } catch (e: Exception) {
+                                    Log.e("RegisterViewModel", "Error updating profile", e)
+                                    _authState.value = AuthState.Error("Profil güncellenemedi: ${e.message}")
+                                }
                             }
-                            .addOnFailureListener {e->
-                                Log.e("RegisterViewModel", "Error saving user data: ${e.message}")
-
-                            }
+                        }.addOnFailureListener { e ->
+                            Log.e("RegisterViewModel", "Error saving user data", e)
+                            _authState.value = AuthState.Error("Kullanıcı bilgileri kaydedilemedi: ${e.message}")
+                        }
                     }
                 }
 
-
-                Log.d("RegisterViewModel", "Successfully saved user data to Firestore")
-
-
-                auth.currentUser?.updateProfile(userProfileChangeRequest {
-                    displayName = savedData.name
-                })?.await()
-                
-                Log.d("RegisterViewModel", "Updated Auth display name")
-                
-                // StateFlow'u güncelle
-                _userName.value = savedData.name
-                
-                // SharedPreferences'ı temizle
-                clearRegistrationDataFromPrefs(context = context)
-                
-                // ProfileScreen'e yönlendir
-                _authState.value = AuthState.ProfileRequired
-                
             } catch (e: Exception) {
-                Log.e("RegisterViewModel", "Error saving user data", e)
-                when (e) {
-                    is FirebaseFirestoreException -> {
-                        Log.e("RegisterViewModel", "Firestore error code: ${e.code}")
-                        Log.e("RegisterViewModel", "Firestore error message: ${e.message}")
-                    }
-                    else -> Log.e("RegisterViewModel", "Unexpected error: ${e.message}")
-                }
+                Log.e("RegisterViewModel", "Error in saveUserToFirestore", e)
                 _authState.value = AuthState.Error("Kullanıcı bilgileri kaydedilemedi: ${e.message}")
             }
         }
@@ -577,7 +589,7 @@ class RegisterViewModel @Inject constructor(
                     
                     // SharedPreferences'a kaydet
                     val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                    sharedPreferences.edit().putString("profileImage", finalImagePath).apply()
+                    sharedPreferences.edit() { putString("profileImage", finalImagePath) }
                 }
                 
                 // Firestore'a kaydet
@@ -683,7 +695,7 @@ class RegisterViewModel @Inject constructor(
 
     private fun deleteUserPref(context: Context){
         val sharedPreferences =  context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-        sharedPreferences.edit().clear().apply()
+        sharedPreferences.edit() { clear() }
     }
 
     fun updateTempPassword(password: String) {
@@ -779,7 +791,7 @@ class RegisterViewModel @Inject constructor(
                 
                 // SharedPreferences'ı temizle
                 val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
-                sharedPreferences.edit().clear().apply()
+                sharedPreferences.edit() { clear() }
                 
                 // Kayıt verilerini temizle
                 clearRegistrationDataFromPrefs(context)
@@ -797,24 +809,7 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-    fun updateProfileImageInFirestore(imageUri: String) {
-        viewModelScope.launch {
-            try {
-                auth.currentUser?.let { user ->
-                    db.collection("users").document(user.uid)
-                        .update("profileImage", imageUri)
-                        .await()
-                    
-                    // StateFlow'u güncelle
-                    _profileImage.value = imageUri
-                    
-                    Log.d("RegisterViewModel", "Profile image updated in Firestore: $imageUri")
-                }
-            } catch (e: Exception) {
-                Log.e("RegisterViewModel", "Error updating profile image in Firestore", e)
-            }
-        }
-    }
+
 
     fun canJoinMoreGroups(): Boolean {
         val currentCount = _joinedGroupsCount.value

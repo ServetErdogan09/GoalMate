@@ -190,7 +190,8 @@ class GroupsAddViewModel @Inject constructor(
                 transaction.set(groupHabitsRef, GroupHabits(
                     habitName = groupName,
                     completedDays = 0,
-                    uncompletedDays = 0
+                    uncompletedDays = 0,
+                    completedTime = currentTime
                 )
                 )
             }.await()
@@ -247,24 +248,14 @@ class GroupsAddViewModel @Inject constructor(
 
 
  // kullanıcı tamamladığını firestore kaydediyoruz duurmu
-    fun markHabitAsCompleted(groupId: String){
+ @RequiresApi(Build.VERSION_CODES.O)
+ fun markHabitAsCompleted(groupId: String, isCompleted: Boolean = true, context: Context){
         viewModelScope.launch {
             try {
                val currentUserId = auth.currentUser?.uid ?: return@launch
-                val today = System.currentTimeMillis()
-                val dateKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(today))
-
-
-                val completionRef = db.collection("users")
-                    .document(currentUserId)
-                    .collection("habitCompletions")
-                    .document(groupId)
-
-
-                val data = hashMapOf(
-                    "lastCompletedDate" to dateKey,
-                    "timestamp" to today
-                )
+               // val currentTime = System.currentTimeMillis()
+                val currentTime = NetworkUtils.getTime(context)
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
                val completedDaysRef = db.collection("users")
                    .document(currentUserId)
@@ -274,27 +265,71 @@ class GroupsAddViewModel @Inject constructor(
                 completedDaysRef.get().addOnSuccessListener {completed->
                         if (completed.exists()){
                             val completedDays = completed.getLong("completedDays")?.toInt() ?:0
-                            Log.d("Firestore", "Tamamlanan gün sayısı: $completedDays")
-                            val newCompletedDays = completedDays +1
-                            completedDaysRef.update("completedDays",newCompletedDays).addOnSuccessListener {
-                                Log.d("Firestore", "Tamamlanan gün sayısı başarıyla güncellendi: $newCompletedDays")
+                            val uncompletedDays = completed.getLong("uncompletedDays")?.toInt() ?:0
+                            val lastCompletionTime = completed.getLong("completedTime") ?: 0
+                            val lastCompletionDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                .format(Date(lastCompletionTime))
+                            val wasCompletedToday = completed.getBoolean("wasCompletedToday") ?: false
 
-                            }
-                                .addOnFailureListener {e->
-                                    Log.e("Firestore", "Güncelleme başarısız oldu", e)
+                            val updates = mutableMapOf<String, Any>()
+                            
+                            // Eğer yeni bir günse
+                            if (lastCompletionDate != today) {
+                                if (isCompleted) {
+                                    updates["completedDays"] = completedDays + 1
+                                } else {
+                                    updates["uncompletedDays"] = uncompletedDays + 1
                                 }
+                            } else {
+                                // Aynı gün içinde durum değişikliği
+                                if (isCompleted && !wasCompletedToday) {
+                                    // Tamamlanmamıştan tamamlandıya
+                                    updates["completedDays"] = completedDays + 1
+                                    if (uncompletedDays > 0) {
+                                        updates["uncompletedDays"] = uncompletedDays - 1
+                                    }
+                                } else if (!isCompleted && wasCompletedToday) {
+                                    // Tamamlanmıştan tamamlanmamışa
+                                    if (completedDays > 0) {
+                                        updates["completedDays"] = completedDays - 1
+                                    }
+                                    updates["uncompletedDays"] = uncompletedDays + 1
+                                }
+                            }
+                            
+                            updates["completedTime"] = currentTime
+                            updates["wasCompletedToday"] = isCompleted
+
+                            completedDaysRef.update(updates).addOnSuccessListener {
+                                Log.d("Firestore", "Alışkanlık durumu başarıyla güncellendi")
+                                _habitCompletedToday.value += (groupId to isCompleted)
+                            }
+                            .addOnFailureListener {e->
+                                Log.e("Firestore", "Güncelleme başarısız oldu", e)
+                            }
                         }else{
-                            Log.d("Firestore", "Belge bulunamadı.")
+                            // Eğer döküman yoksa yeni oluştur
+                            val initialData = hashMapOf(
+                                "completedDays" to if (isCompleted) 1 else 0,
+                                "uncompletedDays" to if (isCompleted) 0 else 1,
+                                "completedTime" to currentTime,
+                                "wasCompletedToday" to isCompleted
+                            )
+                            completedDaysRef.set(initialData)
+                                .addOnSuccessListener {
+                                    Log.d("Firestore", "Yeni alışkanlık kaydı oluşturuldu")
+                                    _habitCompletedToday.value += (groupId to isCompleted)
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("Firestore", "Yeni kayıt oluşturma başarısız oldu", e)
+                                }
                         }
                 }
 
-                completionRef.set(data).await()
-                _habitCompletedToday.value += (groupId to true)
-
             }catch (e:Exception){
-                Log.e("GroupsAddViewModel", "Alışkanlık tamamlandı olarak işaretlenirken bir hata oluştu", e)            }
+                Log.e("GroupsAddViewModel", "Alışkanlık tamamlandı olarak işaretlenirken bir hata oluştu", e)            
+            }
         }
-
     }
 
 
@@ -303,30 +338,36 @@ class GroupsAddViewModel @Inject constructor(
     fun checkHabitCompletion(groupId: String , context: Context){
         viewModelScope.launch {
             val currentServerTime = NetworkUtils.getTime(context = context )
-            Log.e("currentServerTime","$currentServerTime currentServerTime")
             try {
-                // İlk olarak false olarak başlat
-                _habitCompletedToday.value += (groupId to false)
-
                 val currentUserId = auth.currentUser?.uid ?: return@launch
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-                val completionDoc = db.collection("users")
+                // GroupHabits koleksiyonundan kontrol et
+                val habitRef = db.collection("users")
                     .document(currentUserId)
-                    .collection("habitCompletions")
+                    .collection("groupHabits")
                     .document(groupId)
                     .get()
                     .await()
 
+                if (habitRef.exists()) {
+                    val lastCompletionTime = habitRef.getLong("completedTime") ?: 0
+                    val lastCompletionDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        .format(Date(lastCompletionTime))
+                    val wasCompletedToday = habitRef.getBoolean("wasCompletedToday") ?: false
 
-                val lastCompletedDate = completionDoc.getString("lastCompletedDate")
-                val isCompletedToday = lastCompletedDate == today
-
-                _habitCompletedToday.value += (groupId to isCompletedToday)
+                    // Eğer son tamamlama tarihi bugün değilse veya hiç tamamlanmamışsa
+                    if (lastCompletionDate != today) {
+                        _habitCompletedToday.value += (groupId to false)
+                    } else {
+                        _habitCompletedToday.value += (groupId to wasCompletedToday)
+                    }
+                } else {
+                    _habitCompletedToday.value += (groupId to false)
+                }
 
             }catch (e:Exception){
-                Log.e("GroupsAddViewModel", "Alışkanlık tamamlanma durumu kontrol edilirken bir hata oluştu", e)
-                // Hata durumunda da false olarak işaretle
+                Log.e("GroupsAddViewModel", "Alışkanlık durumu kontrol edilirken hata oluştu", e)
                 _habitCompletedToday.value += (groupId to false)
             }
         }
@@ -860,6 +901,13 @@ class GroupsAddViewModel @Inject constructor(
                 return
             }
 
+            // Grup aktif mi kontrol et
+            val groupStatus = group.getString("groupStatus")
+            if (groupStatus == "ACTIVE") {
+                _joinGroupState.value = "Bu grup aktif durumda. Yeni katılımlar kabul edilmiyor."
+                return
+            }
+
             // Üyelik kontrolü
             val currentMembers = group.get("members") as? List<String> ?: emptyList()
             if (currentMembers.contains(userId)) {
@@ -890,12 +938,10 @@ class GroupsAddViewModel @Inject constructor(
                         _joinGroupState.value = "Bu gruba zaten katılım isteği gönderdiniz"
                         return
                     }
-
                     "accepted" -> {
                         _joinGroupState.value = "Bu gruba zaten kabul edildiniz"
                         return
                     }
-
                     "rejected" -> {
                         _joinGroupState.value = "Bu gruba katılım isteğiniz reddedilmişti"
                         return

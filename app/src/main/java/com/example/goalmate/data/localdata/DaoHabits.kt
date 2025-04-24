@@ -35,4 +35,7 @@ interface DaoHabits {
 
     @Query("UPDATE habits SET lastResetDate = :date WHERE id = :habitId")
     suspend fun updateLastResetDate(habitId: Long, date: Long)
+
+    @Query("SELECT * FROM habits WHERE isCompleted = 0 AND isExpired = 0")
+    suspend fun getUncompletedHabits(): List<Habit>
 }

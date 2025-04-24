@@ -13,80 +13,57 @@ import java.time.Instant
 import java.time.ZoneId
 
 object NetworkUtils {
+    private var lastKnownServerTime: Long = 0
+    private var lastServerTimeOffset: Long = 0
 
     @RequiresApi(Build.VERSION_CODES.O)
     suspend fun getTime(context: Context): Long {
-        val currentLocalTime = System.currentTimeMillis()
-        
-        return if (isInternetAvailable(context)) {
-            try {
+        Log.d("SunucuZaman", "getTime fonksiyonu başladı")
+        try {
+            if (isNetworkAvailable(context)) {
+                Log.d("SunucuZaman", "Sunucu zamanı alınmaya çalışılıyor...")
                 val serverTime = getServerTime()
                 if (serverTime != null) {
-                    // Sunucu zamanı ile yerel zaman arasında büyük fark varsa (manipülasyon)
-                    val timeDifference = kotlin.math.abs(serverTime - currentLocalTime)
-                    if (timeDifference > 1000 * 60 * 5) { // 5 dakikadan fazla fark varsa
-                        // Sunucu zamanını kullan
-                        Log.d("MesajTemizleme", "Sunucu zamanı kullanılıyor: $serverTime")
-                        serverTime
-                    } else {
-                        // Yerel zamanı kullan
-                        Log.d("MesajTemizleme", "Yerel zaman kullanılıyor: $currentLocalTime")
-                        currentLocalTime
-                    }
+                    lastKnownServerTime = serverTime
+                    lastServerTimeOffset = serverTime - System.currentTimeMillis()
+                    Log.d("SunucuZaman", "Sunucu zamanı başarıyla alındı: $serverTime, Ofset: $lastServerTimeOffset")
+                    return serverTime
                 } else {
-                    Log.d("MesajTemizleme", "Sunucu zamanı alınamadı, yerel zaman kullanılıyor: $currentLocalTime")
-                    currentLocalTime
+                    Log.e("SunucuZaman", "Sunucu zamanı null döndü")
                 }
-            } catch (e: Exception) {
-                Log.e("MesajTemizleme", "Sunucu zamanı alırken hata: ${e.message}")
-                currentLocalTime
+            } else {
+                Log.w("SunucuZaman", "Ağ bağlantısı yok, tahmini zaman kullanılacak")
             }
-        } else {
-            Log.d("MesajTemizleme", "İnternet bağlantısı yok, yerel zaman kullanılıyor: $currentLocalTime")
-            currentLocalTime
+        } catch (e: Exception) {
+            Log.e("SunucuZaman", "Sunucu zamanı alırken hata: ${e.message}\nStack trace: ${e.stackTraceToString()}")
         }
+
+        val estimatedServerTime = System.currentTimeMillis() + lastServerTimeOffset
+        Log.d("SunucuZaman", "Tahmini sunucu zamanı: $estimatedServerTime (Offset: $lastServerTimeOffset)")
+        return estimatedServerTime
     }
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun normalizeTime(timeMillis: Long): Long {
-        // Zamanı gün başlangıcına normalize et (saat, dakika, saniye sıfırla)
-        val time =  Instant.ofEpochMilli(timeMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
-
-        Log.e("normalizeTime","normalizeTime : $time")
-        return time
-    }
-
-    private fun isInternetAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = connectivityManager.activeNetwork
-        val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-        return networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-    }
-
 
     private suspend fun getServerTime(): Long? {
+        Log.d("SunucuZaman", "getServerTime fonksiyonu başladı")
         val database = FirebaseDatabase.getInstance().reference
-        val timeRef = database.child("serverTime")
+        val serverTimeRef = database.child("serverTime").child("timestamp")
 
         return try {
-            timeRef.setValue(ServerValue.TIMESTAMP).await()
-            val snapshot = timeRef.get().await()
-            snapshot.value as? Long
+            serverTimeRef.setValue(ServerValue.TIMESTAMP).await()
+            val snapshot = serverTimeRef.get().await()
+            val serverTime = snapshot.getValue(Long::class.java)
+            Log.d("SunucuZaman", "Server zamanı alındı: $serverTime")
+            serverTime
         } catch (e: Exception) {
-            Log.e("NetworkUtils", "Firebase time fetch failed: ${e.message}")
+            Log.e("SunucuZaman", "Firebase time fetch failed: ${e.message}\nStack trace: ${e.stackTraceToString()}")
             null
         }
     }
 
-
     fun isNetworkAvailable(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val networkInfo = connectivityManager.activeNetworkInfo
-        return networkInfo != null && networkInfo.isConnected
+        val network = connectivityManager.activeNetwork ?: return false
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 }

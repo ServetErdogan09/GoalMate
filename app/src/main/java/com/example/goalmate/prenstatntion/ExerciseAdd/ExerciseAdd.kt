@@ -34,6 +34,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @RequiresApi(Build.VERSION_CODES.O)
@@ -55,6 +57,9 @@ fun AddHabitScreen(
     var selectedColor by remember {mutableStateOf<Int?>(null)}
     var showIconPicker by remember { mutableStateOf(false) }
     val habitsCount = habitViewModel.countActiveHabits.collectAsState().value
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     // State'leri sıfırla veya mevcut alışkanlığı yükle
     LaunchedEffect(habitId) {
@@ -116,7 +121,8 @@ fun AddHabitScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = colorResource(R.color.beyaz)
+        containerColor = colorResource(R.color.beyaz),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) {
         Column(
             modifier = Modifier
@@ -264,7 +270,12 @@ fun AddHabitScreen(
                             name = it
                         } else {
                             if (toastNumber < 3) {
-                                Toast.makeText(context, "Sadece 30 karakter girebilirsiniz!", Toast.LENGTH_SHORT).show()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "Sadece 30 karakter girebilirsiniz!",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                }
                                 toastNumber += 1
                             }
                         }
@@ -314,34 +325,69 @@ fun AddHabitScreen(
 
                             time = formatTime(hours.toInt(),minutes.toInt())
 
-                            val updatedHabit = Habit(
-                                id = habitId ?: 0,
-                                name = name,
-                                frequency = frequency,
-                                isPrivate = isPrivate,
-                                time = time,
-                                startDate = startDateLong,
-                                finishDate = finishDateLong,
-                                lastCompletedDate = habit?.lastCompletedDate ?: (System.currentTimeMillis() / (1000 * 60 * 60 * 24)),
-                                iconResId = selectedIcon,
-                                habitType = groupOrNormal,
-                                colorResId = selectedColor,
-                                isExpired = false,
-                                completedDays = habit?.completedDays ?: 0
-                            )
-
                             if (habitId != null) {
-                                habitViewModel.updateHabit(updatedHabit)
-                                Toast.makeText(context, "Alışkanlık güncellendi", Toast.LENGTH_SHORT).show()
+                                // Mevcut alışkanlığı güncelle, ancak tamamlanma durumunu ve günleri koru
+                                val updatedHabit = habit?.copy(
+                                    name = name,
+                                    frequency = frequency,
+                                    isPrivate = isPrivate,
+                                    time = time,
+                                    iconResId = selectedIcon,
+                                    habitType = groupOrNormal,
+                                    colorResId = selectedColor,
+                                    // Aşağıdaki değerleri mevcut alışkanlıktan al
+                                    completedDays = habit.completedDays,
+                                    isCompleted = habit.isCompleted,
+                                    lastCompletedDate = habit.lastCompletedDate,
+                                    isExpired = habit.isExpired
+                                )
+                                updatedHabit?.let {
+                                    habitViewModel.updateHabit(it)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Alışkanlık güncellendi",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                }
                             } else {
                                 if (habitsCount <= 5) {
-                                    habitViewModel.addExercise(updatedHabit)
-                                    Toast.makeText(context, "$name başarıyla eklendi", Toast.LENGTH_SHORT).show()
+                                    val newHabit = Habit(
+                                        id = habitId ?: 0,
+                                        name = name,
+                                        frequency = frequency,
+                                        isPrivate = isPrivate,
+                                        time = time,
+                                        startDate = startDateLong,
+                                        finishDate = finishDateLong,
+                                        lastCompletedDate = habit?.lastCompletedDate ?: (System.currentTimeMillis() / (1000 * 60 * 60 * 24)),
+                                        iconResId = selectedIcon,
+                                        habitType = groupOrNormal,
+                                        colorResId = selectedColor,
+                                        isExpired = false,
+                                        completedDays = habit?.completedDays ?: 0
+                                    )
+                                    habitViewModel.addExercise(newHabit)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "$name başarıyla eklendi",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
                                 }
                             }
-                            navController.popBackStack()
+                            // Ekrandan çıkmadan önce kısa bir gecikme ekleyelim ki Snackbar görünsün
+                            coroutineScope.launch {
+                                delay(1000) // 1 saniye bekle
+                                navController.popBackStack()
+                            }
                         } else {
-                            Toast.makeText(context, "Lütfen tüm alanları doldurun", Toast.LENGTH_SHORT).show()
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Lütfen tüm alanları doldurun",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

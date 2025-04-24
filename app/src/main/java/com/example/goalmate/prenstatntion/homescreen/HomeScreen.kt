@@ -6,12 +6,8 @@ import android.media.SoundPool
 import android.os.Build
 import android.util.Log
 import androidx.compose.material3.*
-import android.widget.Toast
 import androidx.annotation.RequiresApi
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,11 +36,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -59,7 +53,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -84,9 +77,7 @@ import com.example.goalmate.viewmodel.RegisterViewModel
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.temporal.ChronoUnit
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.coroutineScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -94,13 +85,19 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.ui.graphics.ColorFilter
 import coil.compose.AsyncImage
 import coil.compose.rememberAsyncImagePainter
 import com.example.goalmate.data.localdata.GroupRequest
 import com.example.goalmate.extrensions.RequestStatus
 import com.example.goalmate.extrensions.RequestsUiState
+import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
+import android.Manifest
+import android.content.pm.PackageManager
+import android.app.Activity
+import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.CoroutineScope
+
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -110,10 +107,10 @@ fun HomeScreen(
     starCoinViewModel: StarCoinViewModel = viewModel(),
     completeDayViewModel: CompleteDayViewModel,
     registerViewModel: RegisterViewModel = viewModel(),
+    groupsAddViewModel: GroupsAddViewModel,
     context: Context,
     motivationQuoteViewModel: MotivationQuoteViewModel = viewModel()
 ) {
-
     val uiState by viewModel.uiState.collectAsState()
     val habits = remember(uiState) {
         when (uiState) {
@@ -125,11 +122,8 @@ fun HomeScreen(
     val userName by registerViewModel.userName.collectAsState()
     val profileImage by registerViewModel.profileImage.collectAsState()
 
-
-
     Log.e("userName","profileImage : $profileImage")
     Log.e("userName","userName : $userName")
-
 
     val currentTime by viewModel.currentTime.collectAsState()
 
@@ -153,7 +147,6 @@ fun HomeScreen(
     val isChecked = viewModel.isChecked.collectAsState().value
     var showExplosion by remember { mutableStateOf(false) }
 
-
     LaunchedEffect(Unit) {
         coroutineScope {
             launch { viewModel.resetHabitsForNewDay() }
@@ -172,7 +165,6 @@ fun HomeScreen(
         }
     }
 
-
     LaunchedEffect(uiState) {
         when (uiState) {
             is ExerciseUiState.Success -> {
@@ -183,10 +175,8 @@ fun HomeScreen(
         }
     }
 
-    // LazyListState'i tanımla
     val lazyListState = rememberLazyListState()
     
-
     val isScrollingUp = remember {
         derivedStateOf {
             lazyListState.firstVisibleItemIndex == 0 || 
@@ -195,11 +185,9 @@ fun HomeScreen(
         }
     }
 
-    // Ekran açıldığında profil verilerini yenile
     LaunchedEffect(Unit) {
         registerViewModel.getCurrentUser(context)
     }
-
 
     LaunchedEffect(profileImage) {
         Log.d("HomeScreen", "Profil resmi güncellendi: $profileImage")
@@ -208,16 +196,148 @@ fun HomeScreen(
     var showRequestsSheet by remember { mutableStateOf(false) }
     val requestsState by viewModel.requestsState.collectAsState()
 
-    // Periyodik kontrol için
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val scope = rememberCoroutineScope()
+
+    // Bildirim izni kontrolü
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    var showPermissions by remember { mutableStateOf(viewModel.isPermissionDenied(context)) }
+    
     LaunchedEffect(Unit) {
-        while (true) {
-            viewModel.checkDailyProgress()
-            delay(30 * 60 * 1000) // Her 30 dakikada bir kontrol et
+        when (ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)) {
+            PackageManager.PERMISSION_GRANTED -> {
+                // İzin zaten verilmiş, bir şey yapmaya gerek yok
+            }
+            PackageManager.PERMISSION_DENIED -> {
+                if (showPermissions) {
+                    if (!ActivityCompat.shouldShowRequestPermissionRationale(
+                            context as Activity,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        )
+                    ) {
+                        showPermissionDialog = true
+                    } else {
+                        // İzin reddedilmiş ve bir daha gösterilmemesi seçtiyse
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Bildirimleri almak için ayarlardan izin vermelisiniz",
+                                actionLabel = "Ayarlar",
+                                duration = SnackbarDuration.Long
+                            )
+                            when (result) {
+                                SnackbarResult.ActionPerformed -> {
+                                    // Ayarlar sayfasına yönlendir
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.fromParts("package", context.packageName, null)
+                                    )
+                                    context.startActivity(intent)
+                                }
+                                SnackbarResult.Dismissed -> {
+                                    // Kullanıcı snackbar'ı kapattı
+                                }
+                            }
+                        }
+                        viewModel.setPermissionDenied(context, false)
+                    }
+                }
+            }
         }
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showPermissionDialog = false
+                viewModel.setPermissionDenied(context, false)
+                scope.launch {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Bildirimleri almak için ayarlardan izin vermelisiniz",
+                        actionLabel = "Ayarlar",
+                        duration = SnackbarDuration.Long
+                    )
+                    when (result) {
+                        SnackbarResult.ActionPerformed -> {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", context.packageName, null)
+                            )
+                            context.startActivity(intent)
+                        }
+                        SnackbarResult.Dismissed -> {
+                            // Kullanıcı snackbar'ı kapattı
+                        }
+                    }
+                }
+            },
+            title = {
+                Text(
+                    text = "Bildirim İzni",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colorResource(R.color.yazirengi)
+                )
+            },
+            text = {
+                Text(
+                    text = "Alışkanlıklarınızı takip edebilmemiz için bildirim iznine ihtiyacımız var. İzin vermek ister misiniz?",
+                    color = colorResource(R.color.yazirengi)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPermissionDialog = false
+                        ActivityCompat.requestPermissions(
+                            context as Activity,
+                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                            101
+                        )
+                    }
+                ) {
+                    Text("İzin Ver", color = colorResource(R.color.kutubordrengi))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showPermissionDialog = false
+                        viewModel.setPermissionDenied(context, false)
+                        scope.launch {
+                            val result = snackbarHostState.showSnackbar(
+                                message = "Bildirimleri almak için ayarlardan izin vermelisiniz",
+                                actionLabel = "Ayarlar",
+                                duration = SnackbarDuration.Long
+                            )
+                            when (result) {
+                                SnackbarResult.ActionPerformed -> {
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.fromParts("package", context.packageName, null)
+                                    )
+                                    context.startActivity(intent)
+                                }
+                                SnackbarResult.Dismissed -> {
+                                    // Kullanıcı snackbar'ı kapattı
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Text("Reddet", color = colorResource(R.color.pastelkirmizi))
+                }
+            }
+        )
     }
 
     Scaffold(
         containerColor = colorResource(R.color.arkaplan),
+        snackbarHost = { 
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = 80.dp) // BottomNavigation'ın üzerinde göstermek için padding ekliyoruz
+            )
+        },
         bottomBar = {
             AnimatedVisibility(
                 visible = isScrollingUp.value,
@@ -230,7 +350,6 @@ fun HomeScreen(
     ) { innerPadding ->
 
         Box(Modifier.fillMaxSize()){
-
 
             if (showExplosion) {
                 PatlayanAnimasyon(
@@ -258,13 +377,11 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .padding(end = 10.dp)
                     ) {
-                        // Profil Resmi ve Hoş Geldin Mesajı
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Start,
-                            modifier = Modifier.weight(1f) // Add weight to take available space
+                            modifier = Modifier.weight(1f)
                         ) {
-                            // Profil Resmi
                             Image(
                                 painter = when {
                                     profileImage.isNotEmpty() -> {
@@ -286,7 +403,7 @@ fun HomeScreen(
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .clickable {
-                                        navController.navigate("UserScreen")
+                                        navController.navigate("BadgesScreen")
                                     }
                                     .size(50.dp)
                                     .clip(CircleShape)
@@ -295,7 +412,6 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.width(12.dp))
 
-                           
                             Column {
                                 Text(
                                     text = userName,
@@ -312,7 +428,6 @@ fun HomeScreen(
                                 )
                             }
                         }
-
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -371,7 +486,6 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // Motive edici söz, alışkanlık durumu ve ilerleme çubuğu
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -383,11 +497,11 @@ fun HomeScreen(
                                 color = colorResource(R.color.yazirengi),
                                 shape = RoundedCornerShape(10.dp)
                             )
-                            .verticalScroll(rememberScrollState())  // İçeriği kaydırılabilir hale getir
+                            .verticalScroll(rememberScrollState())
                     ) {
                         Column(
                             modifier = Modifier
-                                .padding(20.dp) // İçerik boşlukları
+                                .padding(20.dp)
                         ) {
                             Text(
                                 text = "“Her gün kendini geliştirmek için bir fırsattır.”",
@@ -413,35 +527,35 @@ fun HomeScreen(
 
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()  // Satırın tamamını doldurur
-                                    .height(20.dp)   // Gerekirse satırın yüksekliğini ayarlayabilirsiniz
+                                    .fillMaxWidth()
+                                    .height(20.dp)
                             ) {
                                 LinearProgressIndicator(
                                     progress = { progress },
                                     modifier = Modifier
-                                        .weight(1f)  // LinearProgressIndicator genişliği ekranın tamamını kapsar
+                                        .weight(1f)
                                         .clip(RoundedCornerShape(5.dp))
-                                        .height(12.dp),  // Yüksekliği 12.dp olarak artırdık
+                                        .height(12.dp),
                                     color = colorResource(R.color.yazirengi),
                                 )
 
-                                Spacer(modifier = Modifier.width(10.dp)) // LinearProgressIndicator ile Text arasında boşluk
+                                Spacer(modifier = Modifier.width(10.dp))
 
                                 Text(
                                     text = "${"%.0f".format(progress * 100)}%",
                                     color = colorResource(R.color.yazirengi),
-                                    textAlign = TextAlign.Start, // Başlangıç hizasında
+                                    textAlign = TextAlign.Start,
                                     modifier = Modifier
-                                        .align(Alignment.CenterVertically)  // Dikeyde ortalamayı sağlar
-                                        .padding(start = 8.dp) // Biraz boşluk ekleyebilirsiniz
+                                        .align(Alignment.CenterVertically)
+                                        .padding(start = 8.dp)
                                 )
                             }
                         }
 
-                        // Alt çizgiyi Box'ın dışında bir başka katman olarak ekliyoruz
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(10.dp)
                                 .height(10.dp) // Alt çizginin kalınlığı
                                 .background(colorResource(R.color.yazirengi)) // Alt çizginin rengi
                                 .align(Alignment.BottomCenter) // Altta hizalama
@@ -469,40 +583,6 @@ fun HomeScreen(
                     }
                     is ExerciseUiState.Success -> {
                         if (habits.isNotEmpty()) {
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
-                                Text(
-                                    text = "Bugünkü alışkanlığını tamamla ve 10",
-                                    textAlign = TextAlign.Start,
-                                    fontWeight = FontWeight.Bold,
-                                    fontStyle = FontStyle.Italic,
-                                    fontSize = 16.sp,
-                                    color = colorResource(R.color.yazirengi)
-                                )
-
-                                Spacer(modifier = Modifier.width(5.dp))
-
-                                Image(
-                                    painter = painterResource(R.drawable.starsolid),
-                                    contentDescription = "Star Icon",
-                                    modifier = Modifier.size(30.dp)
-                                )
-
-                                Spacer(modifier = Modifier.width(5.dp))
-
-                                Text(
-                                    text = "yıldız kazan!",
-                                    textAlign = TextAlign.Start,
-                                    fontWeight = FontWeight.Bold,
-                                    fontStyle = FontStyle.Italic,
-                                    fontSize = 16.sp,
-                                    color = colorResource(R.color.yazirengi)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
 
                             LazyColumn(
                                 state = lazyListState,
@@ -594,11 +674,6 @@ fun HabitCard(
     var isDialogOpen by remember { mutableStateOf(false) }
 
 
-
-
-    var isChecked by remember(habit.isCompleted) {
-        mutableStateOf(habit.isCompleted)
-    }
 
     val today = LocalDate.now().toEpochDay()
     Log.e("today", "Bugün: $today")
@@ -997,9 +1072,6 @@ fun completionStatus(startMillis: Long, finishMillis: Long, completedDays: Int):
 
 
 
-fun lerp(start: Offset, stop: Offset, fraction: Float): Offset {
-    return start + (stop - start) * fraction
-}
 
 
 @Composable

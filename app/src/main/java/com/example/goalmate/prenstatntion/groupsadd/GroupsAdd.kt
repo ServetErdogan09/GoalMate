@@ -1,6 +1,7 @@
 package com.example.goalmate.prenstatntion.groupsadd
 
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -31,7 +32,10 @@ import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 import com.example.goalmate.viewmodel.RegisterViewModel
 import android.util.Log
+import androidx.annotation.RequiresApi
+import kotlinx.coroutines.delay
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupsAdd(
@@ -39,18 +43,22 @@ fun GroupsAdd(
     viewModel: GroupsAddViewModel = viewModel(),
     registerViewModel: RegisterViewModel = viewModel(),
     motivationQuoteViewModel: MotivationQuoteViewModel
+
 ) {
     var groupName by remember { mutableStateOf("") }
     var frequency by remember { mutableStateOf("Günlük") }
     var isPrivate by remember { mutableStateOf(false) }
     var participationType by remember { mutableStateOf("Herkes") }
-    var participantNumber by remember { mutableStateOf("") }
+    var minParticipantNumber by remember { mutableStateOf("2") }
+    var maxParticipantNumber by remember { mutableStateOf("") }
+    var startDelay by remember { mutableStateOf("1") }
     var selectedCategory by remember { mutableStateOf("Sağlık") }
     var groupDescription by remember { mutableStateOf("") }
     var habitHours by remember { mutableStateOf("") }
     var habitMinutes by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     
@@ -475,36 +483,176 @@ fun GroupsAdd(
                         fontWeight = FontWeight.Bold,
                         color = colorResource(R.color.yazirengi)
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    
+                    // Maximum katılımcı sayısı
+                    Column {
+                        Text(
+                            text = "Maximum Katılımcı Sayısı",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colorResource(R.color.yazirengi)
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = maxParticipantNumber,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty()) {
+                                        maxParticipantNumber = ""
+                                    } else {
+                                        val number = newValue.toIntOrNull()
+                                        if (number != null) {
+                                            if (number > 15) {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Maximum katılımcı sayısı 15'ten büyük olamaz",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                }
+                                                maxParticipantNumber = "15"
+                                            } else if (number <= 0) {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Maximum katılımcı sayısı 1'den küçük olamaz",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                }
+                                                maxParticipantNumber = "1"
+                                            } else {
+                                                maxParticipantNumber = number.toString()
+                                            }
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number
+                                ),
+                                singleLine = true,
+                                shape = RoundedCornerShape(8.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = colorResource(R.color.kutubordrengi),
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                ),
+                                placeholder = { Text("Maximum katılımcı sayısı (1-15)") },
+                                trailingIcon = { Text("kişi") }
+                            )
+                        }
+                    }
+
+                    // Grup başlangıç koşulu
+                    Column {
+                        Text(
+                            text = "Grup Başlangıç Koşulu",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colorResource(R.color.yazirengi)
+                        )
+                        val maxParticipants = maxParticipantNumber.toIntOrNull() ?: 0
+                        val minStartParticipants = when {
+                            maxParticipants <= 3 -> 2
+                            maxParticipants > 3 -> maxParticipants / 2
+                            else -> 2
+                        }
+                        Text(
+                            text = if (maxParticipants > 0) {
+                                "Grup, en az $minStartParticipants kişi katıldığında otomatik olarak başlayacaktır."
+                            } else {
+                                "Lütfen maksimum katılımcı sayısını belirleyin."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colorResource(R.color.pastelkirmizi),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+            }
+            
+            // Grup Başlangıç Zamanı Card
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = colorResource(R.color.arkaplan)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Grup Başlangıç Zamanı",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = colorResource(R.color.yazirengi)
+                    )
+                    
+                    Text(
+                        text = "Grup faaliyetlerinin kaç gün sonra başlayacağını belirleyin.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(R.color.yazirengi)
+                    )
+                    
+                    var expanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         OutlinedTextField(
-                            value = participantNumber,
-                            onValueChange = { newValue ->
-                                if (newValue.isEmpty()) {
-                                    participantNumber = ""
-                                } else {
-                                    val number = newValue.toIntOrNull()
-                                    if (number != null && number <= 30) {
-                                        participantNumber = number.toString()
-                                    }
+                            value = startDelay,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Başlangıç Gecikmesi") },
+                            trailingIcon = {
+                                Row {
+                                    Icon(
+                                        Icons.Filled.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text("gün")
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number
-                            ),
-                            singleLine = true,
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = colorResource(R.color.kutubordrengi),
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline
                             ),
-                            placeholder = { Text("Katılımcı sayısını girin (2-30)") },
-                            trailingIcon = { Text("kişi") }
+                            placeholder = { Text("Başlangıç süresi seçin") }
                         )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            containerColor = colorResource(R.color.gri)
+                        ) {
+                            (1..5).forEach { day ->
+                                DropdownMenuItem(
+                                    text = { Text("$day gün sonra") },
+                                    onClick = {
+                                        startDelay = day.toString()
+                                        expanded = false
+                                    },
+                                    colors = MenuDefaults.itemColors(
+                                        textColor = colorResource(R.color.yazirengi)
+                                    )
+                                )
+                            }
+                        }
                     }
+                    
+                    Text(
+                        text = "Not: Grup minimum katılımcı sayısına ulaştığında, seçilen gecikme süresinden bağımsız olarak otomatik olarak başlayacaktır.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colorResource(R.color.pastelkirmizi),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
 
@@ -564,15 +712,39 @@ fun GroupsAdd(
                                 )
                             }
                         }
-                        (participantNumber.toIntOrNull() ?: 0) < 2 -> {
+                        maxParticipantNumber.isBlank() -> {
                             scope.launch {
                                 snackbarHostState.showSnackbar(
-                                    message = "Grup en az 2 kişi olmalıdır",
+                                    message = "Lütfen maximum katılımcı sayısını belirtin",
                                     duration = SnackbarDuration.Short
                                 )
                             }
                         }
-
+                        maxParticipantNumber.toInt() > 15 -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Maximum katılımcı sayısı 15'ten büyük olamaz",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
+                        maxParticipantNumber.toInt() < 2 -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Grup oluşturulabilmesi için en az 2 katılımcı gerekmektedir.",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                            return@Button
+                        }
+                        startDelay.toIntOrNull() == null || startDelay.toInt() < 1 || startDelay.toInt() > 5 -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Grup başlangıç gecikmesi 1-5 gün arasında olmalıdır",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
                         groupDescription.isBlank() -> {
                             scope.launch {
                                 snackbarHostState.showSnackbar(
@@ -589,7 +761,84 @@ fun GroupsAdd(
                                 )
                             }
                         }
+                        joinedGroupsCount >= maxAllowedGroups -> {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    message = "Maksimum grup limitine ulaştınız ($joinedGroupsCount/$maxAllowedGroups)",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                        }
                         else -> {
+                            // Grup oluşturma işlemi öncesi validation kontrolleri
+                            when {
+                                groupName.isBlank() -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Lütfen grup adını boş bırakmayın",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+                                maxParticipantNumber.isBlank() -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Lütfen maksimum katılımcı sayısını belirtin",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+                                maxParticipantNumber.toInt() > 15 -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Maximum katılımcı sayısı 15'ten büyük olamaz",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+                                maxParticipantNumber.toInt() < 2 -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Grup oluşturulabilmesi için en az 2 katılımcı gerekmektedir.",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+                                startDelay.toIntOrNull() == null || startDelay.toInt() < 1 || startDelay.toInt() > 5 -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Grup başlangıç gecikmesi 1-5 gün arasında olmalıdır",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+
+                                groupDescription.isBlank() -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Lütfen grup açıklamasını boş bırakmayın",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+                                habitHours.isBlank() && habitMinutes.isBlank() -> {
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Lütfen alışkanlık süresini belirtin",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
+                                    return@Button
+                                }
+                            }
+
+                            // Alışkanlık süresini hesapla
                             val totalMinutes = (habitHours.toIntOrNull() ?: 0) * 60 + (habitMinutes.toIntOrNull() ?: 0)
                             if (totalMinutes == 0) {
                                 scope.launch {
@@ -601,30 +850,17 @@ fun GroupsAdd(
                                 return@Button
                             }
 
-                            // Grup oluşturma işlemi öncesi son bir kontrol daha yapalım
-                            if (joinedGroupsCount >= maxAllowedGroups) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = "Maksimum grup limitine ulaştınız ($joinedGroupsCount/$maxAllowedGroups)",
-                                        duration = SnackbarDuration.Short
-                                    )
-                                }
-                                return@Button
-                            }
-
-                            // Grup türü ve katılım türünü belirle
-                            val groupPrivacy = isPrivate // Özel/Açık durumu
-                            val groupParticipationType = if (isPrivate) participationType else "Herkes"
-                            
-                            Log.d("GroupsAdd", "Grup oluşturuluyor:")
-                            Log.d("GroupsAdd", "isPrivate: $groupPrivacy")
-                            Log.d("GroupsAdd", "participationType: $groupParticipationType")
-                            
+                            // Grup oluşturma işlemi
                             scope.launch {
                                 try {
                                     Log.d("GroupsAdd", "Grup oluşturma başlıyor:")
-                                    Log.d("GroupsAdd", "isPrivate = $isPrivate")
-                                    Log.d("GroupsAdd", "participationType = $participationType")
+                                    Log.d("GroupsAdd", "Grup Adı: $groupName")
+                                    Log.d("GroupsAdd", "Kategori: $selectedCategory")
+                                    Log.d("GroupsAdd", "Sıklık: $frequency")
+                                    Log.d("GroupsAdd", "Özel/Açık: $isPrivate")
+                                    Log.d("GroupsAdd", "Katılım Türü: $participationType")
+                                    Log.d("GroupsAdd", "Max Katılımcı: $maxParticipantNumber")
+                                    Log.d("GroupsAdd", "Başlangıç Gecikmesi: $startDelay gün")
                                     
                                     val groupId = viewModel.createGroup(
                                         groupName = groupName,
@@ -632,9 +868,10 @@ fun GroupsAdd(
                                         frequency = frequency,
                                         isPrivate = isPrivate,
                                         participationType = participationType,
-                                        participantNumber = participantNumber.toInt(),
-                                        description = groupDescription,
+                                        maxParticipantNumber = maxParticipantNumber.toInt(),
+                                        startDelay = startDelay.toInt(),
                                         habitDuration = totalMinutes.toString(),
+                                        description = groupDescription,
                                         context = context
                                     )
                                     
@@ -651,15 +888,22 @@ fun GroupsAdd(
                                         if (isPrivate) {
                                             registerViewModel.createGroupCode(groupId)
                                         }
+
+                                        coroutineScope.launch {
+                                            delay(1000)
+                                            navController.popBackStack() // group oluşturulduktan sonra önceki sayfaya geri gelecek
+
+                                        }
+
                                     }
                                 } catch (e: Exception) {
                                     Log.e("GroupsAdd", "Grup oluşturma hatası", e)
-                                    Log.e("GroupsAdd", "isPrivate: $isPrivate")
-                                    Log.e("GroupsAdd", "participationType: $participationType")
-                                    snackbarHostState.showSnackbar(
-                                        message = "Grup oluşturulurken bir hata oluştu: ${e.message}",
-                                        duration = SnackbarDuration.Short
-                                    )
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "Grup oluşturulurken bir hata oluştu: ${e.message}",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -72,9 +72,19 @@ fun GroupListScreen(
     val myGroups by viewModel.myGroups.collectAsState()
     Log.e("myGroups","myGroups . $myGroups")
 
+    // Her görüntülendiğinde verileri yenile
     LaunchedEffect(Unit) {
-        // kullanıcının olduğu gurupları çek
         viewModel.getUserGroups()
+        viewModel.resetGroupList()
+    }
+
+    // Tab değiştiğinde de verileri yenile
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 1) {
+            viewModel.getUserGroups()
+        } else {
+            viewModel.resetGroupList()
+        }
     }
 
     Column(
@@ -305,7 +315,7 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
         modifier = Modifier
             .fillMaxWidth()
             .height(150.dp)
-            .clickable { navController.navigate("GroupDetailScreen/${group.groupId}") },
+            .clickable { navController.navigate("GroupDetailScreen/${group.groupId}/${group.groupName}") },
         border = BorderStroke(width = 0.2.dp , color = colorResource(R.color.yazirengi)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = colorResource(R.color.gri)),
@@ -422,7 +432,7 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                         Card(
                             shape = RoundedCornerShape(20.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (group.members.size >= group.participantNumber)
+                                containerColor = if (group.members.size >= group.muxParticipationCount)
                                     colorResource(R.color.pastelkirmizi).copy(alpha = 0.2f)
                                 else
                                     colorResource(R.color.kutubordrengi).copy(alpha = 0.1f)
@@ -434,23 +444,23 @@ fun GroupCard(group: Group, groupsAddViewModel: GroupsAddViewModel, navControlle
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 Icon(
-                                    painter = if (group.members.size >= group.participantNumber)
+                                    painter = if (group.members.size >= group.muxParticipationCount)
                                         painterResource(R.drawable.close)
                                     else
                                         painterResource(R.drawable.ic_personal_info),
                                     contentDescription = null,
                                     modifier = Modifier.size(20.dp),
-                                    tint = if (group.members.size >= group.participantNumber)
+                                    tint = if (group.members.size >= group.muxParticipationCount)
                                         colorResource(R.color.pastelkirmizi)
                                     else
                                         colorResource(R.color.kutubordrengi)
                                 )
                                 Text(
-                                    text = if (group.members.size >= group.participantNumber)
-                                        "Dolu (${group.members.size}/${group.participantNumber})"
+                                    text = if (group.members.size >= group.muxParticipationCount)
+                                        "Dolu (${group.members.size}/${group.muxParticipationCount})"
                                     else
-                                        "${group.members.size}/${group.participantNumber}",
-                                    color = if (group.members.size >= group.participantNumber)
+                                        "${group.members.size}/${group.muxParticipationCount}",
+                                    color = if (group.members.size >= group.muxParticipationCount)
                                         colorResource(R.color.pastelkirmizi)
                                     else
                                         colorResource(R.color.kutubordrengi),

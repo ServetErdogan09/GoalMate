@@ -36,6 +36,7 @@ import com.example.goalmate.extrensions.RequestStatus
 import com.example.goalmate.extrensions.RequestsUiState
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.delay
+import androidx.core.content.edit
 
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -110,49 +111,20 @@ class HabitViewModel @Inject constructor(
     }
 
 
-    fun checkDailyProgress() {
-        viewModelScope.launch {
-            try {
-                val istanbulZone = ZoneId.of("Europe/Istanbul")
-                val currentTime = Instant.now()
-                    .atZone(istanbulZone)
-                    .toLocalTime()
 
-                // Eğer saat akşam 8'i geçtiyse ve tamamlanmamış alışkanlıklar varsa bildirim gönder
-                if (currentTime.hour >= 20) {
-                    when (val state = _uiState.value) {
-                        is ExerciseUiState.Success -> {
-                            val incompletedHabits = state.habits.count {
-                                !it.isCompleted && !it.isExpired && getRemainingDays(it.finishDate, System.currentTimeMillis(), it) > 0
-                            }
+    // Bildiirm izni alındıysa bir daha alma
 
-                            if (incompletedHabits > 0) {
-                                //notificationHelper.showDailyReminder(incompletedHabits)
-                            }
-                        }
-                        else -> {}
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("HabitViewModel", "Error checking daily progress: ${e.message}")
-            }
-        }
+    fun setPermissionDenied(context: Context , denied: Boolean){
+        val prefs = context.getSharedPreferences("permission_prefs",Context.MODE_PRIVATE)
+        prefs.edit() { putBoolean("permission_prefs", denied) }
     }
 
 
-
-
-    // Alışkanlık tamamlandığında motivasyon mesajı göster
-    fun showCompletionNotification(habitName: String) {
-        val motivationalMessages = listOf(
-            "Harika iş! $habitName alışkanlığını tamamladın!",
-            "Muhteşem! Her gün daha iyiye gidiyorsun!",
-            "Başardın! Bu şekilde devam et!",
-            "Harika bir adım daha! Kendininle gurur duymalısın!"
-        )
-
-      //  notificationHelper.showHabitReminder("Tebrikler!", motivationalMessages.random())
+    fun isPermissionDenied(context: Context) : Boolean{
+        val prefs = context.getSharedPreferences("permission_prefs",Context.MODE_PRIVATE)
+        return prefs.getBoolean("permission_prefs",true)
     }
+
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun calculateRemainingDays(habit: Habit, currentTime: Long) {
@@ -409,9 +381,7 @@ class HabitViewModel @Inject constructor(
     fun updateHabit(habit: Habit) {
         viewModelScope.launch {
             try {
-
                 repository.updateHabit(habit)
-
                 repository.getAllExercises().collect { updatedHabits ->
                     _uiState.value = ExerciseUiState.Success(updatedHabits)
 

@@ -41,6 +41,15 @@ data class HabitHistory(
 
 )
 
+@Entity(tableName = "badges")
+data class Badges(
+    @PrimaryKey val id: String,
+    val iconId: String? = null,
+    val ad : String,
+    val description: String,
+    val isCompleted: Boolean,
+    val category: String // GROUP_COMPLETION, LIMIT_INCREASE, ADMIN, GENERAL_ACHIEVEMENT, APP_USAGE
+)
 
 
 data class ChatMessage(
@@ -95,7 +104,7 @@ data class RegistrationData(
     val maxAllowedGroups :Int = 3
 )
 
-
+// Geçmiş silindiğinde kullanıcılacak
 data class GroupHabit(
     val name : String ,
     val startDate: Long,  // Başlangıç tarihi (milisaniye)
@@ -120,18 +129,51 @@ data class Group(
     val frequency: String = "",
     val isPrivate: Boolean = false,
     val participationType: String = "",
-    val participantNumber: Int = 0,
+    val muxParticipationCount: Int = 0,
+    val minParticipationCount: Int = 0, // Minimum katılımcı sayısı
+    val groupStartTime: String = "",
     val description: String = "",
     val createdAt: Long = 0,
-    val habitDuration: String,
+    val habitDuration: String = "",
     val createdBy: String = "",
     val quote: String = "",
-    val groupCode : String = "",
+    val groupCode: String = "",
     val members: List<String> = emptyList(),
-) {
-    constructor() : this("", "", "", "", false, "", 0, "", 0, "", "", "","", emptyList())
-}
+    val groupStatus: String = "WAITING", // WAITING, ACTIVE, CLOSED
+    val startDeadline: Long = 0, // Grubun başlaması gereken son tarih
+    val actualStartDate: Long? = null // Grubun gerçekte başladığı tarih
+)
 
+// Her gurup için ayrı bir users koleksiyonun içinde tutulacak alt koleksiyon
+data class GroupHabits(
+    val habitName : String = "",
+    val completedDays : Int = 0,
+    val uncompletedDays : Int = 0,
+    val completedTime : Long = 0L,
+)
+
+// Her kullanıcı için ayrı bir users koleksiyonun içinde tutulacak alt koleksiyon
+data class GroupHabitStats(
+  val dailyGroupsCompleted : Int = 0,
+  val weeklyGroupsCompleted : Int = 0,
+  val monthlyGroupsCompleted : Int = 0
+)
+
+
+data class GroupCloseVoteState(
+    val votingEndTime: Long = 0,
+    val yesVotes: Int = 0,
+    val noVotes: Int = 0,
+    val totalMembers: Int = 0,
+    val hasUserVoted: Boolean = false,
+    val canAdminInitiateVote: Boolean = true,
+    val startTime: Long = 0
+)
+
+// her kullanıcı tammaladığı rozetlerin id si tutlacak
+data class BadgesId(
+    val badgesId: Int = 0
+)
 
 @Entity(
     tableName = "motivation_quotes",

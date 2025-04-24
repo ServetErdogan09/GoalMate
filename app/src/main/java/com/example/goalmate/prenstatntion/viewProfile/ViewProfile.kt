@@ -161,12 +161,13 @@ fun ViewProfile(
                 ) {
                     IconButton(
                         onClick = { navController.popBackStack() },
-                        modifier = Modifier.padding(start = 2.dp)
+                        modifier = Modifier.padding(start = 4.dp , top = 30.dp)
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.back),
                             contentDescription = "Geri",
-                            tint = colorResource(id = R.color.yazirengi)
+                            tint = colorResource(id = R.color.yazirengi),
+
                         )
                     }
 
@@ -178,7 +179,7 @@ fun ViewProfile(
                             fontSize = 22.sp
                         ),
                         color = colorResource(id = R.color.yazirengi),
-                        modifier = Modifier.padding(start = 10.dp)
+                        modifier = Modifier.padding(start = 10.dp , top = 30.dp)
                     )
                 }
             }
@@ -216,7 +217,7 @@ fun ViewProfile(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 16.dp),
+                                    .padding(top = 15.dp, bottom = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 // Profile Image with animated border
@@ -512,7 +513,7 @@ fun GroupCard(group: Group,navController: NavController) {
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .clickable {
-                navController.navigate("GroupDetailScreen/${group.groupId}")
+                navController.navigate("GroupDetailScreen/${group.groupId}/${group.groupName}")
             },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(

@@ -561,62 +561,71 @@ fun HeaderComponent(
     completedDayViewModel: CompleteDayViewModel,
     targetDay: Long
 ) {
-
     val showDialog = remember { mutableStateOf(false) }
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 16.dp, vertical = 30.dp)
     ) {
-        // Geri Butonu
-        Image(
-            painter = painterResource(R.drawable.back),
-            contentDescription = "Geri Tuşu",
-            modifier = Modifier
-                .size(30.dp)
-                .clickable { onBackClick() }
-        )
-
-        // Düzenle ve Sil Butonları
         Row(
-            horizontalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            // Geri Butonu
             Image(
-                painter = painterResource(R.drawable.edit),
-                contentDescription = "Düzenle",
+                painter = painterResource(R.drawable.back),
+                contentDescription = "Geri Tuşu",
                 modifier = Modifier
                     .size(30.dp)
-                    .clickable {
-                        habit?.let {
-                            navController.navigate("AddHabitScreen?isGroup=${it.habitType == "group"}&habitId=${it.id}")
+                    .clickable { onBackClick() }
+
+            )
+
+            // Düzenle ve Sil Butonları
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.edit),
+                    contentDescription = "Düzenle",
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clickable {
+                            habit?.let {
+                                navController.navigate("AddHabitScreen?isGroup=${it.habitType == "group"}&habitId=${it.id}")
+                            }
                         }
-                    }
-            )
-            Image(
-                painter = painterResource(R.drawable.delete),
-                contentDescription = "Sil",
-                modifier = Modifier
-                    .size(30.dp)
-                    .clickable {
+
+                )
+                Image(
+                    painter = painterResource(R.drawable.delete),
+                    contentDescription = "Sil",
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clickable {
                             showDialog.value = true
-                    }
-            )
+                        }
+
+                )
+            }
         }
     }
 
     if (showDialog.value) {
-            val kalanGun = remainingDays(habit!!.completedDays, totalHabit(habit.frequency))
-        Log.e("kalanGun", "kalanGun: $kalanGun")
-
+        val kalanGun = remainingDays(habit!!.completedDays, totalHabit(habit.frequency))
         CustomAlertDialog(
-            onDismiss = {showDialog.value = false} ,
-            onConfirm = {showDialog.value = false
-            onDeleteClick()} , kalanGun = kalanGun,
+            onDismiss = { showDialog.value = false },
+            onConfirm = {
+                showDialog.value = false
+                onDeleteClick()
+            },
+            kalanGun = kalanGun,
             onBackClick,
             completedDayViewModel = completedDayViewModel,
-            habit,
+            habit = habit,
             targetDay = targetDay
         )
     }
@@ -624,14 +633,10 @@ fun HeaderComponent(
 
 @RequiresApi(Build.VERSION_CODES.O)
 fun totalHabit(isFrequency: String): Int {
-
-    val currentMonth = LocalDate.now().month  // Bu ayı alıyoruz
-    val daysInMonth = currentMonth.length(LocalDate.now().isLeapYear)  // O ayın gün sayısını alıyoruz
-
     return when (isFrequency) {
         "Günlük" -> 1
         "Haftalık" -> 7
-        "Aylık" -> daysInMonth
+        "Aylık" -> 30
         else -> 1
     }
 }

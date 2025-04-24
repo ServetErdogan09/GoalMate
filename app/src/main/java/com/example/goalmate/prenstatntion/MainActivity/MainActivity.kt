@@ -2,13 +2,9 @@ package com.example.goalmate.prenstatntion.MainActivity
 
 import AllRequestsScreen
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,7 +33,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -69,183 +64,32 @@ import com.example.goalmate.presentation.GroupsListScreen.GroupListScreen
 import com.example.goalmate.utils.CloudinaryConfig
 import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.google.firebase.auth.FirebaseAuth
-import android.Manifest
-import android.app.AlertDialog
-import android.content.pm.PackageManager
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.firestore.FirebaseFirestore
-import androidx.core.app.NotificationCompat
+import com.example.goalmate.prenstatntion.BaseScreen.BaseScreen
+import com.example.goalmate.prenstatntion.RulesScreen.RulesScreen
+import com.example.goalmate.prenstatntion.ScoreBoard.ScoreBoardScreen
 import com.example.goalmate.prenstatntion.showGroupChatScreen.ShowGroupChatScreen
 import com.example.goalmate.prenstatntion.viewProfile.ViewProfile
+import com.example.goalmate.presentation.badgesScreen.BadgesScreen
+import com.example.goalmate.viewmodel.BadgesViewModel
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
-import com.google.firebase.firestore.FirestoreRegistrar
+import com.example.goalmate.viewmodel.ScoreBoardViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // bildiirim izin verildiyse tokunu güncele
-            //updateFCMToken()
-            Log.d("Notification", "Bildirim izni verildi")
-        } else {
-            // İzin reddedildi kullanıcıyı bilgilendir
-            Toast.makeText(
-                this,
-                "Bildirimleri almak için izin vermeniz gerekiyor. Ayarlardan izin verebilirsiniz.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-   // tokunu güncele
-    private fun updateFCMToken() {
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                val token = task.result
-                Log.d("FCM", "New token: $token")
-                
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
-                if (userId != null) {
-                    FirebaseFirestore.getInstance().collection("users").document(userId)
-                        .update(
-                            mapOf(
-                                "fcmToken" to token,
-                                "lastTokenUpdate" to System.currentTimeMillis(),
-                                "notificationEnabled" to true
-                            )
-                        )
-                        .addOnSuccessListener {
-                            Log.d("FCM", "Token updated successfully")
-                            // Test bildirimi gönder
-                            sendTestNotification()
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e("FCM", "Token update failed", e)
-                        }
-                }
-            } else {
-                Log.e("FCM", "Failed to get FCM token", task.exception)
-            }
-        }
-    }
-
-    private fun sendTestNotification() {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "group_notifications"
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Grup Bildirimleri",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Grup bildirimleri için kanal"
-                enableLights(true)
-                enableVibration(true)
-            }
-            notificationManager.createNotificationChannel(channel)
-        }
-
-        val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.goal_mate)
-            .setContentTitle("Test Bildirimi")
-            .setContentText("Bildirimler başarıyla ayarlandı!")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-
-        notificationManager.notify(1001, builder.build())
-    }
-
-    // Bildirim iznini kontrol et
-    private fun checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    NOTIFICATION_PERMISSION_REQUEST_CODE
-                )
-            }
-        }
-    }
-
-    private fun askNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                AlertDialog.Builder(this)
-                    .setTitle("Bildirim İzni Gerekli")
-                    .setMessage("Grup isteklerini ve önemli güncellemeleri alabilmek için bildirim iznine ihtiyacımız var.")
-                    .setPositiveButton("İzin Ver") { _, _ ->
-                        requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    .setNegativeButton("Şimdi Değil") { dialog, _ ->
-                        dialog.dismiss()
-                        Toast.makeText(
-                            this,
-                            "Bildirimleri almak için ayarlardan izin vermelisiniz",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                    .show()
-            } else {
-              //  updateFCMToken()
-            }
-        } else {
-            //updateFCMToken()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        
-        // FCM token'ı manuel olarak alalım ve loglayalım
-        FirebaseMessaging.getInstance().token
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Log.d("FCM", "Current Token: ${task.result}")
-                } else {
-                    Log.e("FCM", "Token failed", task.exception)
-                }
-            }
-
-        // Bildirim izinlerini kontrol et ve test bildirimi gönder
-        //askNotificationPermission()
-
         enableEdgeToEdge()
         setContent {
             YeniProjeTheme {
-                ChangingScreen()
+                BaseScreen {
+                    ChangingScreen()
+                }
+
             }
         }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-    private fun requestNotificationPermission() {
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                1001
-            )
-        }
-    }
-
-    companion object {
-        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 123
     }
 }
 
@@ -260,9 +104,11 @@ fun ChangingScreen() {
     val completeDayViewModel: CompleteDayViewModel = viewModel()
     val groupsAddViewModel : GroupsAddViewModel = viewModel()
     val motivationQuoteViewModel : MotivationQuoteViewModel = viewModel()
+    val badgesViewModel : BadgesViewModel = viewModel()
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
+    val scoreBoardViewModel : ScoreBoardViewModel = viewModel()
 
 
     // Yeni başlatmayı ekle
@@ -337,9 +183,12 @@ fun ChangingScreen() {
                 currentRoute != "GroupsAdd" &&
                 currentRoute != "ProfileScreen" &&
                 currentRoute != "register_screen" &&
+                currentRoute != "RulesScreen" &&
                 currentRoute != "WelcomeScreen" &&
                 currentRoute != "UserScreen" &&
+                currentRoute != "BadgesScreen" &&
                 !currentRoute.startsWith("showGroupChatScreen") &&
+                !currentRoute.startsWith("ScoreBoardScreen") &&
                 !currentRoute.startsWith("ViewProfile")
             ) {
                 BottomNavigationBar(navController)
@@ -359,6 +208,9 @@ fun ChangingScreen() {
             composable(route = "ProfileScreen") {
                 ProfileScreen(navController = navController)
             }
+            composable(route = "BadgesScreen") {
+                BadgesScreen(navController = navController, badgesViewModel = badgesViewModel,context)
+            }
 
 
 
@@ -375,7 +227,7 @@ fun ChangingScreen() {
             }
 
             composable(route = "HomeScreen") {
-                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context, motivationQuoteViewModel = motivationQuoteViewModel)
+                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context, motivationQuoteViewModel = motivationQuoteViewModel, groupsAddViewModel = groupsAddViewModel)
             }
 
 
@@ -424,16 +276,38 @@ fun ChangingScreen() {
                  GroupListScreen(navController, viewModel = groupsAddViewModel , registerViewModel = registerViewModel)
             }
 
+
+            composable(route = "RulesScreen") {
+                RulesScreen(navController)
+            }
+
             composable(
-                route = "showGroupChatScreen/{groupedId}",
+                route = "showGroupChatScreen/{groupedId}/{groupName}/{members}/{daysLeft}/{habitType}",
                 arguments = listOf(
                     navArgument("groupedId") {
+                        type = NavType.StringType
+                    },
+                    navArgument("groupName") {  // groupName parametresini ekledik
+                        type = NavType.StringType
+                    },
+                    navArgument(name = "members"){
+                        type = NavType.IntType
+                    },
+                    navArgument("daysLeft"){
+                        type = NavType.LongType
+                    },
+
+                    navArgument("habitType"){
                         type = NavType.StringType
                     }
                 )
             ) { backStackEntry ->
                 val groupedId = backStackEntry.arguments?.getString("groupedId") ?: ""
-                ShowGroupChatScreen(navController = navController, groupedId = groupedId, groupsAddViewModel = groupsAddViewModel)
+                val groupName = backStackEntry.arguments?.getString("groupName") ?:""
+                val habitType = backStackEntry.arguments?.getString("habitType") ?:"Günlük"
+                val groupMembers = backStackEntry.arguments?.getInt("members") ?: 0
+                val groupDaysLeft = backStackEntry.arguments?.getLong("daysLeft") ?: 0  // getInt yerine getLong ve doğru parametre
+                ShowGroupChatScreen(navController = navController, groupedId = groupedId, groupsAddViewModel = groupsAddViewModel, groupName = groupName, members = groupMembers, daysLeft = groupDaysLeft , habitType = habitType)
             }
 
             composable(
@@ -453,17 +327,34 @@ fun ChangingScreen() {
             }
 
             composable(
-                route = "GroupDetailScreen/{groupId}",
+                route = "GroupDetailScreen/{groupId}/{groupName}",
                 arguments = listOf(
                     navArgument("groupId"){
+                        type = NavType.StringType
+                    },
+                    navArgument("groupName"){
                         type = NavType.StringType
                     }
                 )
             ) {backStackEntry->
                 val groupId = backStackEntry.arguments?.getString("groupId")?:""
-                GroupDetailScreen(groupId = groupId,navController , groupsAddViewModel, motivationQuoteViewModel = motivationQuoteViewModel, registerViewModel = registerViewModel)
+                val groupName = backStackEntry.arguments?.getString("groupName")?:""
+                GroupDetailScreen(groupId = groupId, navController = navController , groupName = groupName, motivationQuoteViewModel = motivationQuoteViewModel, registerViewModel = registerViewModel, groupsAddViewModel = groupsAddViewModel)
             }
 
+
+            composable(
+                route = "ScoreBoardScreen/{groupId}",
+                arguments = listOf(
+                    navArgument("groupId"){
+                        type = NavType.StringType
+                    }
+                )
+            ){backStackEntry->
+
+                val groupId = backStackEntry.arguments?.getString("groupId") ?:""
+                ScoreBoardScreen(viewModel = scoreBoardViewModel , groupId , navController)
+            }
 
             composable(
                 route = "ViewProfile/{userId}",
