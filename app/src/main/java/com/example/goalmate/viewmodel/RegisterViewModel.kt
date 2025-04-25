@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.toLowerCase
 import kotlinx.coroutines.CancellationException as JobCancellationException
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -41,12 +42,13 @@ import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.data.localdata.GroupHabitStats
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.SupervisorJob
+import com.example.goalmate.data.repository.PointsRepository
 
 @HiltViewModel
 class RegisterViewModel @Inject constructor(
     private val auth: FirebaseAuth,
     private val db: FirebaseFirestore,
-    @ApplicationContext private val  context: Context
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
     private val _registrationData = MutableStateFlow(RegistrationData())
     val registrationData: StateFlow<RegistrationData> = _registrationData.asStateFlow()
@@ -54,8 +56,7 @@ class RegisterViewModel @Inject constructor(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    private val _totalPoint = MutableStateFlow<Int>(0)
-    val totalPoint : StateFlow<Int> = _totalPoint.asStateFlow()
+
 
     // Kayıt aşamasını takip etmek için
     private val _currentStep = MutableStateFlow(RegistrationStep.EMAIL_PASSWORD)
@@ -815,6 +816,31 @@ class RegisterViewModel @Inject constructor(
 
 
 
+    // Kullanıcının grup sayılarını günceller
+    suspend fun updateUserGroupCounts(userId: String) {
+        try {
+            val userDoc = db.collection("users").document(userId).get().await()
+            if (userDoc.exists()) {
+                val joinedGroups = userDoc.get("joinedGroups") as? List<*> ?: emptyList<String>()
+                val maxAllowed = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+
+                _joinedGroupsCount.value = joinedGroups.size
+                _maxAllowedGroups.value = maxAllowed
+
+                Log.d("RegisterViewModel", """
+                    Grup Sayıları Güncellendi:
+                    - Kullanıcı ID: $userId
+                    - Mevcut Grup Sayısı: ${joinedGroups.size}
+                    - Maximum İzin: $maxAllowed
+                """.trimIndent())
+            }
+        } catch (e: Exception) {
+            Log.e("RegisterViewModel", "Grup sayıları güncellenirken hata oluştu", e)
+        }
+    }
+
+
+
     fun canJoinMoreGroups(): Boolean {
         val currentCount = _joinedGroupsCount.value
         val maxAllowed = _maxAllowedGroups.value
@@ -830,49 +856,6 @@ class RegisterViewModel @Inject constructor(
         return canJoin
     }
 
-
-
-    // total puanı çek
-    fun  getTotalPoint(){
-        viewModelScope.launch {
-            try {
-                val userId = auth.currentUser?.uid?:return@launch
-                val totalPoint = db.collection("users")
-                    .document(userId)
-                    .get()
-                    .await()
-
-                val point = totalPoint.getLong("totalPoints")!!.toInt()
-                _totalPoint.value = point
-            }catch (e:Exception){
-                Log.e("getTotalPoint","total point çekerken hata oluştu")
-            }
-        }
-    }
-
-
-    // Kullanıcının grup sayılarını günceller
-    suspend fun updateUserGroupCounts(userId: String) {
-        try {
-            val userDoc = db.collection("users").document(userId).get().await()
-            if (userDoc.exists()) {
-                val joinedGroups = userDoc.get("joinedGroups") as? List<*> ?: emptyList<String>()
-                val maxAllowed = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
-                
-                _joinedGroupsCount.value = joinedGroups.size
-                _maxAllowedGroups.value = maxAllowed
-                
-                Log.d("RegisterViewModel", """
-                    Grup Sayıları Güncellendi:
-                    - Kullanıcı ID: $userId
-                    - Mevcut Grup Sayısı: ${joinedGroups.size}
-                    - Maximum İzin: $maxAllowed
-                """.trimIndent())
-            }
-        } catch (e: Exception) {
-            Log.e("RegisterViewModel", "Grup sayıları güncellenirken hata oluştu", e)
-        }
-    }
 }
 
 

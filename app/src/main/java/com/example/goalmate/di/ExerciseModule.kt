@@ -16,6 +16,7 @@ import com.example.goalmate.viewmodel.StarCoinViewModel
 import com.example.goalmate.data.repository.HabitRepository
 import com.example.goalmate.data.repository.HistoryHabitsRepository
 import com.example.goalmate.data.repository.MotivationQuoteRepository
+import com.example.goalmate.data.repository.PointsRepository
 import com.example.goalmate.data.repository.StarCoinRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
@@ -56,6 +57,15 @@ object ExerciseModule {
     @Singleton
     fun provideHabitHistoryDao(database: AppDatabase): HabitHistoryDao {
         return database.habitHistoryDao()
+    }
+
+
+
+    @Provides
+    @Singleton
+
+    fun providePointsRepository(firestore: FirebaseFirestore , auth: FirebaseAuth) : PointsRepository{
+        return PointsRepository(auth,firestore)
     }
 
 
@@ -112,6 +122,8 @@ object ExerciseModule {
     fun provideStarCoinViewModel(starCoinRepository: StarCoinRepository): StarCoinViewModel {
         return StarCoinViewModel(starCoinRepository)
     }
+
+
 
 
     //------------------------------------Badges----------------------------------------------------//

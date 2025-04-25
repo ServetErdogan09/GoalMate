@@ -100,8 +100,18 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.goalmate.utils.NetworkUtils
 import kotlin.math.abs
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.LottieConstants
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
 
 /**
  * Mesaj veri sınıfı - Her bir mesajın özelliklerini içerir
@@ -131,6 +141,24 @@ fun ShowGroupChatScreen(
     groupsAddViewModel: GroupsAddViewModel
 ){
     val context = LocalContext.current
+    
+    // Puan animasyonu için state'ler
+    var showPointsAnimation by remember { mutableStateOf(false) }
+    var pointsChange by remember { mutableStateOf(0) }
+    
+    // Mevcut puanı takip et
+    val currentPoints by groupsAddViewModel.totalPoint.collectAsState()
+    var lastPoints by remember { mutableStateOf(currentPoints) }
+    
+    // Puan değişikliğini kontrol et
+    LaunchedEffect(currentPoints) {
+        if (lastPoints != currentPoints) {
+            pointsChange = currentPoints - lastPoints
+            showPointsAnimation = true
+            lastPoints = currentPoints
+        }
+    }
+
     var showNoInternetDialog by remember { mutableStateOf(false) }
 
     // İnternet bağlantısını kontrol et
@@ -743,6 +771,13 @@ fun ShowGroupChatScreen(
             }
         }
     }
+    
+    // Puan animasyonu dialog'u
+    PointsAnimationDialog(
+        isVisible = showPointsAnimation,
+        points = pointsChange,
+        onDismiss = { showPointsAnimation = false }
+    )
 }
 
 /**
@@ -1188,4 +1223,87 @@ private fun sendMessage(
         onMessageSent()
     }
 }
+
+@RequiresApi(Build.VERSION_CODES.O)
+@Composable
+fun PointsAnimationDialog(
+    isVisible: Boolean,
+    points: Int,
+    onDismiss: () -> Unit
+) {
+    if (isVisible) {
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true
+            )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Karakter görseli
+                    val imageRes = if (points > 0) R.drawable.happ else R.drawable.sady
+
+                    Image(
+                        painter = painterResource(id = imageRes),
+                        contentDescription = null,
+                        modifier = Modifier.size(200.dp),
+                        contentScale = ContentScale.Fit
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Puan metni
+                    Text(
+                        text = if (points > 0) "+$points Puan" else "$points Puan",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = if (points > 0) colorResource(id = R.color.yesil2) else colorResource(id = R.color.pastelkirmizi),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Açıklama metni
+                    Text(
+                        text = if (points > 0) {
+                            "Tebrikler! Alışkanlığını tamamladın ve puan kazandın! 🎉"
+                        } else {
+                            warningText()
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = colorResource(id = R.color.yazirengi)
+                    )
+
+                }
+            }
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+ fun warningText() : String{
+
+    val currentHour = LocalTime.now().hour
+    return when (currentHour) {
+        in 5..10 -> "Henüz sabah, ama işleri erteleme! Hadi görevi tamamla ☀️"
+        in 11..16 -> "Vakit geçiyor, görevi tamamlamak için iyi bir zaman! ⏳"
+        in 17..20 -> "Akşam oluyor, alışkanlığını tamamlamayı unutma 🌇"
+        in 21..23 -> "Gün neredeyse bitti! Hadi hemen tamamla ⏰"
+        in 0..4 -> "Gece oldu ama hâlâ bir şansın var! Bitir ve rahat uyu 🌙"
+        else -> "Görevini hatırlıyor musun? Tamamlama zamanı!"
+    }
+}
+
 

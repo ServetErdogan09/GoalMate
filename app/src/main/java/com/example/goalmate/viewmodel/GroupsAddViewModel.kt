@@ -29,16 +29,21 @@ import androidx.annotation.RequiresApi
 import com.example.goalmate.data.localdata.GroupCloseVoteState
 import com.example.goalmate.data.localdata.GroupHabitStats
 import com.example.goalmate.data.localdata.GroupHabits
+import com.example.goalmate.data.repository.PointsRepository
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.toObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.example.goalmate.viewmodel.RegisterViewModel
+import kotlinx.coroutines.delay
+import android.content.Context as AndroidContext
 
 @HiltViewModel
 class GroupsAddViewModel @Inject constructor(
     private val db: FirebaseFirestore,
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
+    private val pointsRepository: PointsRepository
 ) : ViewModel() {
 
     private val _groupCreationState =
@@ -59,6 +64,10 @@ class GroupsAddViewModel @Inject constructor(
 
     private val _groupListState = MutableStateFlow<GroupListState>(GroupListState.Loading)
     val groupListState = _groupListState.asStateFlow()
+
+
+    private val _totalPoint = MutableStateFlow<Int>(0)
+    val totalPoint : StateFlow<Int> = _totalPoint.asStateFlow()
 
     private val _userNames = MutableStateFlow<Map<String, String>>(emptyMap())
     val userNames: StateFlow<Map<String, String>> = _userNames.asStateFlow()
@@ -193,11 +202,11 @@ class GroupsAddViewModel @Inject constructor(
                     habitName = groupName,
                     completedDays = 0,
                     uncompletedDays = 0,
-                    completedTime = currentTime
+                    completedTime = currentTime,
+                    wasCompletedToday = false
                 )
                 )
             }.await()
-
 
             // UI'ı güncelle
             val newGroup = Group(
@@ -251,98 +260,136 @@ class GroupsAddViewModel @Inject constructor(
 
  // kullanıcı tamamladığını firestore kaydediyoruz duurmu
  @RequiresApi(Build.VERSION_CODES.O)
- fun markHabitAsCompleted(groupId: String, isCompleted: Boolean = true, context: Context){
-        viewModelScope.launch {
-            try {
-               val currentUserId = auth.currentUser?.uid ?: return@launch
-               // val currentTime = System.currentTimeMillis()
-                val currentTime = NetworkUtils.getTime(context)
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+ fun markHabitAsCompleted(groupId: String, isCompleted: Boolean = true, context: Context, frequency: String? = null) {
+    viewModelScope.launch {
+        try {
+            val currentUserId = auth.currentUser?.uid ?: return@launch
+            val currentTime = System.currentTimeMillis()
+            val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(currentTime))
 
-               val completedDaysRef = db.collection("users")
-                   .document(currentUserId)
-                   .collection("groupHabits")
-                   .document(groupId)
+            Log.d("HabitCompletion", "Alışkanlık durumu güncelleniyor - isCompleted: $isCompleted")
 
-                completedDaysRef.get().addOnSuccessListener {completed->
-                        if (completed.exists()){
-                            val completedDays = completed.getLong("completedDays")?.toInt() ?:0
-                            val uncompletedDays = completed.getLong("uncompletedDays")?.toInt() ?:0
-                            val lastCompletionTime = completed.getLong("completedTime") ?: 0
-                            val lastCompletionDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                .format(Date(lastCompletionTime))
-                            val wasCompletedToday = completed.getBoolean("wasCompletedToday") ?: false
+            // Önce grup dokümanından grup ismini ve frekansını al
+            val groupDoc = db.collection("groups")
+                .document(groupId)
+                .get()
+                .await()
 
-                            val updates = mutableMapOf<String, Any>()
-                            
-                            // Eğer yeni bir günse
-                            if (lastCompletionDate != today) {
-                                if (isCompleted) {
-                                    updates["completedDays"] = completedDays + 1
-                                } else {
-                                    updates["uncompletedDays"] = uncompletedDays + 1
-                                }
-                            } else {
-                                // Aynı gün içinde durum değişikliği
-                                if (isCompleted && !wasCompletedToday) {
-                                    // Tamamlanmamıştan tamamlandıya
-                                    updates["completedDays"] = completedDays + 1
-                                    if (uncompletedDays > 0) {
-                                        updates["uncompletedDays"] = uncompletedDays - 1
-                                    }
-                                } else if (!isCompleted && wasCompletedToday) {
-                                    // Tamamlanmıştan tamamlanmamışa
-                                    if (completedDays > 0) {
-                                        updates["completedDays"] = completedDays - 1
-                                    }
-                                    updates["uncompletedDays"] = uncompletedDays + 1
-                                }
+            val groupName = groupDoc.getString("groupName") ?: return@launch
+            val groupFrequency = frequency ?: groupDoc.getString("frequency") ?: "Günlük"
+
+            Log.d("HabitCompletion", "Grup frekansı: $groupFrequency")
+
+            val completedDaysRef = db.collection("users")
+                .document(currentUserId)
+                .collection("groupHabits")
+                .document(groupId)
+
+            completedDaysRef.get().addOnSuccessListener { completed ->
+                if (completed.exists()) {
+                    val completedDays = completed.getLong("completedDays")?.toInt() ?: 0
+                    val uncompletedDays = completed.getLong("uncompletedDays")?.toInt() ?: 0
+                    val lastCompletionTime = completed.getLong("completedTime") ?: 0
+                    val lastCompletionDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        .format(Date(lastCompletionTime))
+                    val wasCompletedToday = completed.getBoolean("wasCompletedToday") ?: false
+
+                    Log.d("HabitCompletion", """
+                        Mevcut durum:
+                        - Tamamlanan günler: $completedDays
+                        - Tamamlanmayan günler: $uncompletedDays
+                        - Son tamamlama tarihi: $lastCompletionDate
+                        - Bugün tamamlandı mı: $wasCompletedToday
+                    """.trimIndent())
+
+                    val updates = mutableMapOf<String, Any>()
+
+                    if (lastCompletionDate == today) {
+                        // Aynı gün içinde durum değişikliği
+                        if (isCompleted && !wasCompletedToday) {
+                            // Tamamlanmamıştan tamamlandıya
+                            updates["completedDays"] = completedDays + 1
+                            if (uncompletedDays > 0) {
+                                updates["uncompletedDays"] = uncompletedDays - 1
                             }
-                            
-                            updates["completedTime"] = currentTime
-                            updates["wasCompletedToday"] = isCompleted
+                            // Önce kesilen puanı geri ver, sonra tamamlama puanını ekle
+                            scoreCalculation(groupFrequency, false, context, isReversingPenalty = true)
+                            Log.d("HabitCompletion", "Kesilen puan geri veriliyor ve tamamlama puanı ekleniyor")
+                        } else if (!isCompleted && wasCompletedToday) {
+                            // Tamamlanmıştan tamamlanmamışa
+                            if (completedDays > 0) {
+                                updates["completedDays"] = completedDays - 1
+                            }
+                            updates["uncompletedDays"] = uncompletedDays + 1
+                            // Sadece ceza puanını uygula
+                            scoreCalculation(groupFrequency, false, context, isReversingPenalty = false)
+                            Log.d("HabitCompletion", "Tamamlanmama cezası uygulanıyor")
+                        }
+                    } else {
+                        // Yeni bir gün
+                        if (isCompleted) {
+                            updates["completedDays"] = completedDays + 1
+                            scoreCalculation(groupFrequency, true, context, isReversingPenalty = false)
+                            Log.d("HabitCompletion", "Yeni gün - Tamamlama puanı ekleniyor")
+                        } else {
+                            updates["uncompletedDays"] = uncompletedDays + 1
+                            scoreCalculation(groupFrequency, false, context, isReversingPenalty = false)
+                            Log.d("HabitCompletion", "Yeni gün - Tamamlanmama cezası uygulanıyor")
+                        }
+                    }
+                    
+                    updates["completedTime"] = currentTime
+                    updates["wasCompletedToday"] = isCompleted
 
-                            completedDaysRef.update(updates).addOnSuccessListener {
-                                Log.d("Firestore", "Alışkanlık durumu başarıyla güncellendi")
-                                _habitCompletedToday.value += (groupId to isCompleted)
-                            }
-                            .addOnFailureListener {e->
-                                Log.e("Firestore", "Güncelleme başarısız oldu", e)
-                            }
-                        }else{
-                            // Eğer döküman yoksa yeni oluştur
-                            val initialData = hashMapOf(
-                                "completedDays" to if (isCompleted) 1 else 0,
-                                "uncompletedDays" to if (isCompleted) 0 else 1,
-                                "completedTime" to currentTime,
-                                "wasCompletedToday" to isCompleted
-                            )
-                            completedDaysRef.set(initialData)
-                                .addOnSuccessListener {
-                                    Log.d("Firestore", "Yeni alışkanlık kaydı oluşturuldu")
-                                    _habitCompletedToday.value += (groupId to isCompleted)
-                                }
-                                .addOnFailureListener { e ->
-                                    Log.e("Firestore", "Yeni kayıt oluşturma başarısız oldu", e)
-                                }
+                    Log.d("HabitCompletion", "Güncellenecek değerler: $updates")
+
+                    completedDaysRef.update(updates).addOnSuccessListener {
+                        Log.d("HabitCompletion", "Alışkanlık durumu başarıyla güncellendi")
+                        _habitCompletedToday.value += (groupId to isCompleted)
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("HabitCompletion", "Güncelleme başarısız oldu", e)
+                    }
+                } else {
+                    // Eğer döküman yoksa yeni oluştur
+                    val initialData = hashMapOf(
+                        "completedDays" to if (isCompleted) 1 else 0,
+                        "uncompletedDays" to if (isCompleted) 0 else 1,
+                        "habitName" to groupName,
+                        "completedTime" to currentTime,
+                        "wasCompletedToday" to isCompleted
+                    )
+                    
+                    Log.d("HabitCompletion", "Yeni alışkanlık kaydı oluşturuluyor: $initialData")
+                    
+                    completedDaysRef.set(initialData)
+                        .addOnSuccessListener {
+                            Log.d("HabitCompletion", "Yeni alışkanlık kaydı oluşturuldu")
+                            _habitCompletedToday.value += (groupId to isCompleted)
+                            // Yeni kayıt için puan hesaplama
+                            scoreCalculation(groupFrequency, isCompleted, context, isReversingPenalty = false)
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e("HabitCompletion", "Yeni kayıt oluşturma başarısız oldu", e)
                         }
                 }
-
-            }catch (e:Exception){
-                Log.e("GroupsAddViewModel", "Alışkanlık tamamlandı olarak işaretlenirken bir hata oluştu", e)            
             }
+        } catch (e: Exception) {
+            Log.e("HabitCompletion", "Alışkanlık durumu güncellenirken bir hata oluştu", e)            
         }
     }
+}
 
 
     // tamamlanıp tammalanmadığını kontrol et
     @RequiresApi(Build.VERSION_CODES.O)
     fun checkHabitCompletion(groupId: String , context: Context){
         viewModelScope.launch {
-            val currentServerTime = NetworkUtils.getTime(context = context )
+           // val currentServerTime = NetworkUtils.getTime(context = context)
+            val currentServerTime = System.currentTimeMillis()
             try {
                 val currentUserId = auth.currentUser?.uid ?: return@launch
-                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(currentServerTime))
 
                 // GroupHabits koleksiyonundan kontrol et
                 val habitRef = db.collection("users")
@@ -358,9 +405,18 @@ class GroupsAddViewModel @Inject constructor(
                         .format(Date(lastCompletionTime))
                     val wasCompletedToday = habitRef.getBoolean("wasCompletedToday") ?: false
 
+                    Log.d("HabitCompletion", """
+                        Alışkanlık durumu kontrolü:
+                        - Son tamamlama tarihi: $lastCompletionDate
+                        - Bugün: $today
+                        - Bugün tamamlandı mı: $wasCompletedToday
+                    """.trimIndent())
+
                     // Eğer son tamamlama tarihi bugün değilse veya hiç tamamlanmamışsa
                     if (lastCompletionDate != today) {
                         _habitCompletedToday.value += (groupId to false)
+                        // Yeni gün başladığında wasCompletedToday'i sıfırla
+                        habitRef.reference.update("wasCompletedToday", false)
                     } else {
                         _habitCompletedToday.value += (groupId to wasCompletedToday)
                     }
@@ -368,9 +424,55 @@ class GroupsAddViewModel @Inject constructor(
                     _habitCompletedToday.value += (groupId to false)
                 }
 
-            }catch (e:Exception){
+            } catch (e:Exception){
                 Log.e("GroupsAddViewModel", "Alışkanlık durumu kontrol edilirken hata oluştu", e)
                 _habitCompletedToday.value += (groupId to false)
+            }
+        }
+    }
+
+
+    // puan hesaplama işlemleri
+    // total puanı çek
+    fun  getTotalPoint(){
+        viewModelScope.launch {
+            try {
+                val userId = auth.currentUser?.uid?:return@launch
+                val totalPoint = db.collection("users")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                val point = totalPoint.getLong("totalPoints")!!.toInt()
+                _totalPoint.value = point
+            }catch (e:Exception){
+                Log.e("getTotalPoint","total point çekerken hata oluştu")
+            }
+        }
+    }
+
+
+
+    private fun scoreCalculation(frequency: String, isCompleted: Boolean, context: Context, isReversingPenalty: Boolean = false) {
+        viewModelScope.launch {
+            try {
+                Log.d("ScoreCalculation", """
+                    Puan hesaplama başlatılıyor:
+                    - Frekans: $frequency
+                    - Tamamlandı mı: $isCompleted
+                    - Ceza Geri Alınıyor mu: $isReversingPenalty
+                """.trimIndent())
+
+                val newPoints = pointsRepository.calculateAndUpdatePoints(
+                    frequency = frequency,
+                    isCompleted = isCompleted,
+                    isReversingPenalty = isReversingPenalty
+                )
+                _totalPoint.value = newPoints
+                
+                Log.d("ScoreCalculation", "Yeni puan değeri: $newPoints")
+            } catch (e: Exception) {
+                Log.e("ScoreCalculation", "Puan hesaplanırken hata oluştu", e)
             }
         }
     }
