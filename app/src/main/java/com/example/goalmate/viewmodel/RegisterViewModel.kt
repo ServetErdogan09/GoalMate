@@ -62,6 +62,8 @@ class RegisterViewModel @Inject constructor(
     private val _currentStep = MutableStateFlow(RegistrationStep.EMAIL_PASSWORD)
     val currentStep: StateFlow<RegistrationStep> = _currentStep.asStateFlow()
 
+
+
     private val _verificationState = MutableStateFlow<VerificationState>(VerificationState.Idle)
     val verificationState = _verificationState.asStateFlow()
 
@@ -235,6 +237,7 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
+
 
 
     fun updateEmail(email: String) {

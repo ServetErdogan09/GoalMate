@@ -95,7 +95,13 @@ import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 import android.Manifest
 import android.content.pm.PackageManager
 import android.app.Activity
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.app.ActivityCompat
+import com.example.goalmate.utils.Constants
 import kotlinx.coroutines.CoroutineScope
 
 
@@ -120,8 +126,9 @@ fun HomeScreen(
     }
 
     val userName by registerViewModel.userName.collectAsState()
-    val totalPoint = registerViewModel.totalPoint.collectAsState().value
+    val totalPoint = groupsAddViewModel.totalPoint.collectAsState().value
     val profileImage by registerViewModel.profileImage.collectAsState()
+
 
     Log.e("userName","profileImage : $profileImage")
     Log.e("userName","userName : $userName")
@@ -132,7 +139,7 @@ fun HomeScreen(
 
     LaunchedEffect(Unit) {
         viewModel.getCountActiveHabit()
-        registerViewModel.getTotalPoint()
+        groupsAddViewModel.getCurrentTotalPoint()
     }
 
     LaunchedEffect(totalHabits) {
@@ -384,33 +391,38 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.Start,
                             modifier = Modifier.weight(1f)
                         ) {
-                            Image(
-                                painter = when {
-                                    profileImage.isNotEmpty() -> {
-                                        when {
-                                            profileImage.startsWith("http") || profileImage.startsWith("content") -> {
-                                                rememberAsyncImagePainter(
-                                                    model = profileImage,
-                                                    error = painterResource(R.drawable.personel)
-                                                )
-                                            }
-                                            else -> {
-                                                painterResource(getProfilePainter(profileImage, R.drawable.personel))
-                                            }
-                                        }
-                                    }
-                                    else -> painterResource(R.drawable.personel)
-                                },
-                                contentDescription = "Profile Image",
-                                contentScale = ContentScale.Crop,
+                            Box(
                                 modifier = Modifier
-                                    .clickable {
-                                        navController.navigate("BadgesScreen")
-                                    }
                                     .size(50.dp)
                                     .clip(CircleShape)
                                     .border(1.dp, colorResource(R.color.yazirengi), CircleShape)
-                            )
+                            ) {
+                                Image(
+                                    painter = when {
+                                        profileImage.isNotEmpty() -> {
+                                            when {
+                                                profileImage.startsWith("http") || profileImage.startsWith("content") -> {
+                                                    rememberAsyncImagePainter(
+                                                        model = profileImage,
+                                                        error = painterResource(R.drawable.personel)
+                                                    )
+                                                }
+                                                else -> {
+                                                    painterResource(getProfilePainter(profileImage, R.drawable.personel))
+                                                }
+                                            }
+                                        }
+                                        else -> painterResource(R.drawable.personel)
+                                    },
+                                    contentDescription = "Profile Image",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .clickable {
+                                            navController.navigate("BadgesScreen")
+                                        }
+                                        .fillMaxSize()
+                                )
+                            }
 
                             Spacer(modifier = Modifier.width(12.dp))
 
@@ -423,11 +435,23 @@ fun HomeScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                Text(
-                                    text = "Hoş Geldin",
-                                    color = colorResource(R.color.yazirengi),
-                                    fontSize = 14.sp
-                                )
+                                
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Start,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    RankBadge(rank = Constants.getRankFromPoints(totalPoint) , modifier = Modifier)
+                                    /*
+                                    Text(
+                                        text = "Hoş Geldin",
+                                        color = colorResource(R.color.yazirengi),
+                                        fontSize = 14.sp,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+
+                                     */
+                                }
                             }
                         }
 
@@ -438,6 +462,7 @@ fun HomeScreen(
                                 .padding(start = 8.dp)
                                 .width(130.dp)
                         ) {
+
                             Box(
                                 modifier = Modifier
                                     .size(30.dp)
@@ -463,6 +488,8 @@ fun HomeScreen(
                                     }
                                 }
                             }
+
+
 
                             Spacer(modifier = Modifier.width(30.dp))
 
@@ -611,6 +638,14 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(16.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Image(
+                                painter = painterResource(R.drawable.empty),
+                                contentDescription = "",
+                                modifier = Modifier.size(350.dp)
                             )
                         }
                     }
@@ -1419,3 +1454,62 @@ fun RequestItem(
 }
 
 
+
+@Composable
+fun RankBadge(rank: String , modifier: Modifier) {
+    val ranks = listOf(
+        "Acemi" to listOf(Color(0xFF48C9B0), Color(0xFF45B39D)),
+        "Başlangıç" to listOf(Color(0xFF5DADE2), Color(0xFF3498DB)),
+        "Çaylak" to listOf(Color(0xFF9B59B6), Color(0xFF8E44AD)),
+        "Disiplinli" to listOf(Color(0xFFF4D03F), Color(0xFFF1C40F)),
+        "Kararlı" to listOf(Color(0xFFE74C3C), Color(0xFFC0392B)),
+        "Usta" to listOf(Color(0xFF2ECC71), Color(0xFF27AE60)),
+        "Bilge" to listOf(Color(0xFF8E44AD), Color(0xFF6C3483)),
+        "Efsane" to listOf(Color(0xFFFFD700), Color(0xFFFFA500))
+    )
+
+    ranks.find { it.first.lowercase() == rank.lowercase() }?.let { (rankName, colors) ->
+        Box(
+            modifier
+                .background(
+                    brush = Brush.horizontalGradient(colors = colors.map { it.copy(alpha = 0.15f) }),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.horizontalGradient(colors = colors),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 2.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Start,
+                modifier = Modifier.height(20.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = colors[1],
+                    modifier = Modifier.size(12.dp)
+                )
+                
+                Spacer(modifier = Modifier.width(4.dp))
+                
+                Text(
+                    text = rankName,
+                    color = colors[1],
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    style = TextStyle(
+                        shadow = Shadow(
+                            color = colors[0].copy(alpha = 0.3f),
+                            offset = Offset(0f, 1f),
+                            blurRadius = 2f
+                        )
+                    )
+                )
+            }
+        }
+    }
+}

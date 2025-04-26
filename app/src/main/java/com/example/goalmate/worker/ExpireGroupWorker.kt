@@ -9,6 +9,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.prenstatntion.AnalysisScreen.totalHabit
+import com.example.goalmate.utils.Constants
 import com.example.goalmate.utils.NetworkUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -39,7 +40,8 @@ class ExpireGroupWorker @AssistedInject constructor(
 
             Log.d("ExpireGroupWorker", "Aktif grup sayısı: ${activeGroups.size}")
 
-            val currentTime = NetworkUtils.getTime(applicationContext) // test amaçlı yerel saat kullanılıyor testen sonra değiştirilecek
+            //val currentTime = NetworkUtils.getTime(applicationContext) // test amaçlı yerel saat kullanılıyor testen sonra değiştirilecek
+            val currentTime = System.currentTimeMillis() // test amaçlı yerel saat kullanılıyor testen sonra değiştirilecek
             val calendar = Calendar.getInstance().apply {
                 timeInMillis = currentTime
                 set(Calendar.HOUR_OF_DAY, 0)
@@ -68,6 +70,7 @@ class ExpireGroupWorker @AssistedInject constructor(
 
                     if (remainingDays <= 1) {
                         // Grubu kapat
+                       //  gurubu kapatmadan önce gurup başarı puanına bakıp puanları verelim
                         closeGroup(group.groupId)
                         Log.d("ExpireGroupWorker", "Grup ${group.groupId} kapatıldı")
                     }
@@ -83,8 +86,12 @@ class ExpireGroupWorker @AssistedInject constructor(
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun closeGroup(groupId: String) {
         try {
+            // Önce grup başarı oranını hesapla ve gerekirse bonus puanları dağıt
+            calculateGroupSuccessRate(groupId)
+
             // Önce tüm kullanıcıların joinedGroups listesinden bu grubu çıkar
             val usersSnapshot = db.collection("users").get().await()
             val batch = db.batch()
@@ -141,4 +148,54 @@ class ExpireGroupWorker @AssistedInject constructor(
             throw e
         }
     }
+
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private suspend fun calculateGroupSuccessRate(groupId: String) {
+        try {
+            val groupDoc = db.collection("groups").document(groupId).get().await()
+            
+            val groupCompletedDays = groupDoc.getLong("groupCompletedDays")?.toInt() ?: 0
+            val groupFrequency = groupDoc.getString("frequency") ?: ""
+            val membersList = groupDoc.get("members") as? List<String> ?: emptyList()
+            val groupMembersCount = membersList.size
+            val totalDays = totalHabit(groupFrequency)
+            
+            // Başarı oranını hesapla
+            val successRate = (groupCompletedDays.toFloat() / (totalDays * groupMembersCount)) * 100
+            
+            // Başarı oranı %80'i geçerse bonus puanları dağıt
+            if (successRate >= 80) {
+                val bonusPoints = when (groupFrequency) {
+                    "günlük" -> 0  // Günlük gruplara bonus yok
+                    "haftalık" -> 5 // Haftalık gruplara +5 bonus
+                    "aylık" -> 10 // Aylık gruplara +10 bonus
+                    else -> 0
+                }
+                
+                if (bonusPoints > 0) {
+                    val batch = db.batch()
+                    
+                    // Doğrudan members listesindeki kullanıcıları güncelle
+                    for (userId in membersList) {
+                        val userRef = db.collection("users").document(userId)
+                        val userDoc = userRef.get().await()
+                        val currentPoints = userDoc.getLong("points") ?: 0
+                        batch.update(userRef, "points", currentPoints + bonusPoints)
+                    }
+                    
+                    // Batch işlemini gerçekleştir
+                    batch.commit().await()
+                    Log.d("ExpireGroupWorker", "Bonus puanlar dağıtıldı: +$bonusPoints puan")
+                }
+            }
+            
+            Log.d("ExpireGroupWorker", "Grup başarı oranı: $successRate%")
+        } catch (e: Exception) {
+            Log.e("ExpireGroupWorker", "Grup başarı oranı hesaplanırken hata: ${e.message}")
+            throw e
+        }
+    }
+
+
 }

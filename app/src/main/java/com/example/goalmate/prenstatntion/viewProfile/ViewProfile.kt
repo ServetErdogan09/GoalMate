@@ -35,10 +35,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -46,7 +49,9 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.goalmate.R
 import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.data.localdata.HabitFirebase
+import com.example.goalmate.prenstatntion.homescreen.RankBadge
 import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
+import com.example.goalmate.utils.Constants
 import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.example.goalmate.viewmodel.RegisterViewModel
 import com.google.firebase.auth.FirebaseAuth
@@ -69,7 +74,7 @@ fun ViewProfile(
     val userName = userNames[userId] ?: "Yükleniyor..."
     val profileImage = profileImages[userId] ?: ""
 
-    val totalPoint = registerViewModel.totalPoint.collectAsState().value
+    val totalPoint = groupsAddViewModel.totalPoint.collectAsState().value
 
     // State for user's groups
     var userGroups by remember { mutableStateOf<List<Group>>(emptyList()) }
@@ -78,11 +83,13 @@ fun ViewProfile(
     var joinDate by remember { mutableStateOf("01.01.2023") }
     var selectedTab by remember { mutableStateOf(0) }
 
+
+
     // firestoreden verileri çek
     LaunchedEffect(userId) {
         groupsAddViewModel.getUsersName(userId)
         groupsAddViewModel.getProfile(userId)
-        registerViewModel.getTotalPoint()
+        groupsAddViewModel.getTotalPoint(userId)
 
         val db = FirebaseFirestore.getInstance()
 
@@ -175,16 +182,36 @@ fun ViewProfile(
                         )
                     }
 
+
                     Text(
-                        text = userName,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily(Font(R.font.noto_regular)),
-                            fontSize = 22.sp
-                        ),
-                        color = colorResource(id = R.color.yazirengi),
-                        modifier = Modifier.padding(start = 10.dp , top = 30.dp)
+                        text = buildAnnotatedString {
+                            withStyle(
+                                style = SpanStyle(
+                                    fontSize = 22.sp, // Kullanıcının ismi boyutu
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily(Font(R.font.noto_regular)),
+                                    color = colorResource(id = R.color.yazirengi)
+                                )
+                            ) {
+                                append(userName)
+                                append(" ")
+                            }
+                            withStyle(
+                                style = SpanStyle(
+                                    fontSize = 15.sp, // Sonsuzluk işaretinin ayrı büyük boyutu
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily(Font(R.font.noto_regular)),
+                                    color = colorResource(id = R.color.yazirengi)
+                                )
+                            ) {
+                                append("∞")
+                            }
+                        },
+                        modifier = Modifier.padding(start = 10.dp, top = 30.dp)
                     )
+                    RankBadge(rank = Constants.getRankFromPoints(totalPoint) , modifier = Modifier.padding(start = 10.dp , top = 30.dp))
+
+
                 }
             }
         }
@@ -218,6 +245,7 @@ fun ViewProfile(
                                 .fillMaxWidth()
                         ) {
                             // Profile Info Row
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

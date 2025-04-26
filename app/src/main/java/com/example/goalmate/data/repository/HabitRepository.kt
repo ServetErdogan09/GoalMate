@@ -1,20 +1,27 @@
 package com.example.goalmate.data.repository
 
+import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import androidx.lifecycle.viewModelScope
 import com.example.goalmate.data.AuthState
 import com.example.goalmate.data.localdata.DaoHabits
 import com.example.goalmate.data.localdata.Habit
 import com.example.goalmate.data.localdata.HabitFirebase
+import com.example.goalmate.utils.NetworkUtils
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.text.SimpleDateFormat
 import javax.inject.Inject
 import java.time.Instant
 import java.time.ZoneId
+import java.util.Date
+import java.util.Locale
 
 class HabitRepository @Inject constructor(
     private val daoHabits: DaoHabits,
@@ -171,6 +178,9 @@ class HabitRepository @Inject constructor(
             Log.e("resetHabits", "Sıfırlama hatası: ${e.message}")
         }
     }
+
+
+
 
     fun getHabitId(habitId: Int): Flow<Habit?> {
         return daoHabits.getHabitId(habitId)

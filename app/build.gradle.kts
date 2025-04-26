@@ -106,6 +106,8 @@ dependencies {
     implementation ("com.google.accompanist:accompanist-systemuicontroller:0.28.0")
 
 
+    implementation( "com.airbnb.android:lottie-compose:6.3.0")
+
     // API 33 ve üzeri
     implementation( libs.accompanist.permissions)
 

@@ -69,6 +69,7 @@ class GroupsAddViewModel @Inject constructor(
     private val _totalPoint = MutableStateFlow<Int>(0)
     val totalPoint : StateFlow<Int> = _totalPoint.asStateFlow()
 
+
     private val _userNames = MutableStateFlow<Map<String, String>>(emptyMap())
     val userNames: StateFlow<Map<String, String>> = _userNames.asStateFlow()
 
@@ -180,7 +181,8 @@ class GroupsAddViewModel @Inject constructor(
                 "members" to listOf(currentUserId),
                 "groupStatus" to "WAITING",
                 "startDeadline" to startDeadline,
-                "actualStartDate" to null
+                "actualStartDate" to null,
+                "groupCompletedDays" to 0
             )
 
             // Grup oluşturma ve kullanıcı güncelleme işlemlerini transaction içinde yap
@@ -229,6 +231,7 @@ class GroupsAddViewModel @Inject constructor(
                 groupStatus = "WAITING",
                 startDeadline = startDeadline,
                 actualStartDate = null
+
             )
 
             val currentGroups =
@@ -270,12 +273,11 @@ class GroupsAddViewModel @Inject constructor(
             Log.d("HabitCompletion", "Alışkanlık durumu güncelleniyor - isCompleted: $isCompleted")
 
             // Önce grup dokümanından grup ismini ve frekansını al
-            val groupDoc = db.collection("groups")
-                .document(groupId)
-                .get()
-                .await()
+            val groupRef = db.collection("groups").document(groupId)
+            val groupDoc = groupRef.get().await()
 
             val groupName = groupDoc.getString("groupName") ?: return@launch
+            val groupCompletedDays = groupDoc.getLong("groupCompletedDays")?.toInt() ?: 0
             val groupFrequency = frequency ?: groupDoc.getString("frequency") ?: "Günlük"
 
             Log.d("HabitCompletion", "Grup frekansı: $groupFrequency")
@@ -309,6 +311,16 @@ class GroupsAddViewModel @Inject constructor(
                         if (isCompleted && !wasCompletedToday) {
                             // Tamamlanmamıştan tamamlandıya
                             updates["completedDays"] = completedDays + 1
+                            // Grup tamamlanan günleri güncelle
+                            viewModelScope.launch {
+                                groupRef.update("groupCompletedDays", groupCompletedDays + 1)
+                                    .addOnSuccessListener {
+                                        Log.d("HabitCompletion", "Grup tamamlanan günler güncellendi: ${groupCompletedDays + 1}")
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.e("HabitCompletion", "Grup tamamlanan günler güncellenirken hata: ${e.message}")
+                                    }
+                            }
                             if (uncompletedDays > 0) {
                                 updates["uncompletedDays"] = uncompletedDays - 1
                             }
@@ -329,6 +341,16 @@ class GroupsAddViewModel @Inject constructor(
                         // Yeni bir gün
                         if (isCompleted) {
                             updates["completedDays"] = completedDays + 1
+                            // Yeni günde tamamlandıysa grup tamamlanan günleri artır
+                            viewModelScope.launch {
+                                groupRef.update("groupCompletedDays", groupCompletedDays + 1)
+                                    .addOnSuccessListener {
+                                        Log.d("HabitCompletion", "Grup tamamlanan günler güncellendi: ${groupCompletedDays + 1}")
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.e("HabitCompletion", "Grup tamamlanan günler güncellenirken hata: ${e.message}")
+                                    }
+                            }
                             scoreCalculation(groupFrequency, true, context, isReversingPenalty = false)
                             Log.d("HabitCompletion", "Yeni gün - Tamamlama puanı ekleniyor")
                         } else {
@@ -368,6 +390,19 @@ class GroupsAddViewModel @Inject constructor(
                             _habitCompletedToday.value += (groupId to isCompleted)
                             // Yeni kayıt için puan hesaplama
                             scoreCalculation(groupFrequency, isCompleted, context, isReversingPenalty = false)
+                            
+                            // Yeni kayıt ve tamamlandıysa grup tamamlanan günleri artır
+                            if (isCompleted) {
+                                viewModelScope.launch {
+                                    groupRef.update("groupCompletedDays", groupCompletedDays + 1)
+                                        .addOnSuccessListener {
+                                            Log.d("HabitCompletion", "Grup tamamlanan günler güncellendi: ${groupCompletedDays + 1}")
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Log.e("HabitCompletion", "Grup tamamlanan günler güncellenirken hata: ${e.message}")
+                                        }
+                                }
+                            }
                         }
                         .addOnFailureListener { e ->
                             Log.e("HabitCompletion", "Yeni kayıt oluşturma başarısız oldu", e)
@@ -434,7 +469,24 @@ class GroupsAddViewModel @Inject constructor(
 
     // puan hesaplama işlemleri
     // total puanı çek
-    fun  getTotalPoint(){
+    fun  getTotalPoint(userId: String){
+        viewModelScope.launch {
+            try {
+                val totalPoint = db.collection("users")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                val point = totalPoint.getLong("totalPoints")!!.toInt()
+                _totalPoint.value = point
+            }catch (e:Exception){
+                Log.e("getTotalPoint","total point çekerken hata oluştu")
+            }
+        }
+    }
+
+
+    fun  getCurrentTotalPoint(){
         viewModelScope.launch {
             try {
                 val userId = auth.currentUser?.uid?:return@launch
@@ -450,6 +502,7 @@ class GroupsAddViewModel @Inject constructor(
             }
         }
     }
+
 
 
 
@@ -478,37 +531,67 @@ class GroupsAddViewModel @Inject constructor(
     }
 
 
-    fun closeGroup(groupId: String) { // yöetici tarafından kapatılabilir grup
-        viewModelScope.launch {
-            db.collection("users").get()
-                .addOnSuccessListener { documents ->
-                    val batch = db.batch() // toplu işlem başlat
+      fun closeGroup(groupId: String) {
+          viewModelScope.launch {
+              try {
+                  // Önce tüm kullanıcıların joinedGroups listesinden bu grubu çıkar
+                  val usersSnapshot = db.collection("users").get().await()
+                  val batch = db.batch()
 
-                    for (document in documents) {
-                        val userRef = db.collection("users").document(document.id)
-                        // members listesinden bu gurubu çıkar
-                        batch.update(userRef, "members", FieldValue.arrayRemove(groupId))
-                    }
-                    batch.commit().addOnSuccessListener {
-                        db.collection("groups").document(groupId)
-                            .delete()
-                            .addOnSuccessListener {
-                                Log.d("Firestore", "Grup başarıyla silindi: $groupId.")
-                            }
-                            .addOnFailureListener { e ->
-                                Log.e("Firestore", "Grubu silerken hata oluştu", e)
-                            }
-                    }.addOnFailureListener { e ->
-                        Log.e("Firestore", "Kullanıcıları güncellerken hata oluştu", e)
+                  for (userDoc in usersSnapshot.documents) {
+                      val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: continue
+                      if (groupId in joinedGroups) {
+                          val userRef = db.collection("users").document(userDoc.id)
+                          batch.update(userRef, "joinedGroups", joinedGroups - groupId)
 
-                    }
-                }.addOnFailureListener { e ->
-                    Log.e("Firestore", "Kullanıcıları çekerken hata oluştu", e)
+                          // Kullanıcının groupHabits koleksiyonundan da sil
+                          val groupHabitsRef = userRef.collection("groupHabits").document(groupId)
+                          batch.delete(groupHabitsRef)
+                      }
+                  }
 
-                }
-        }
+                  // Batch işlemini tamamla
+                  batch.commit().await()
+
+                  // Grubun mesajlarını sil
+                  val messagesSnapshot = db.collection("groups")
+                      .document(groupId)
+                      .collection("messages")
+                      .get()
+                      .await()
+
+                  if (!messagesSnapshot.isEmpty) {
+                      val messageBatch = db.batch()
+                      messagesSnapshot.documents.forEach { doc ->
+                          messageBatch.delete(doc.reference)
+                      }
+                      messageBatch.commit().await()
+                  }
+
+                  // Grubun oylama verilerini sil
+                  val closeVoteRef = db.collection("groups")
+                      .document(groupId)
+                      .collection("closeVote")
+                      .document("status")
+
+                  if (closeVoteRef.get().await().exists()) {
+                      closeVoteRef.delete().await()
+                  }
+
+                  // Son olarak grubu tamamen sil
+                  db.collection("groups")
+                      .document(groupId)
+                      .delete()
+                      .await()
+
+                  Log.d("ExpireGroupWorker", "Grup $groupId ve ilişkili tüm veriler başarıyla silindi")
+              } catch (e: Exception) {
+                  Log.e("ExpireGroupWorker", "Grup silinirken hata: ${e.message}")
+                  throw e
+              }
+          }
+
     }
-
 
 
 
@@ -529,6 +612,8 @@ class GroupsAddViewModel @Inject constructor(
                     val userDoc = transaction.get(userRef)
                     val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
 
+                    userRef.collection("groupHabits").document(groupId).delete()
+
                     if (group != null) {
                         // Gruptan kullanıcıyı çıkar
                         val updatedMembers = group.members.filter { it != currentUser.uid }
@@ -546,8 +631,10 @@ class GroupsAddViewModel @Inject constructor(
                         Log.d("leaveGroup", "Yeni katıldığı gruplar: $updatedJoinedGroups")
 
                         // Eğer son üye ayrılıyorsa grubu kapat
-                        if (updatedMembers.isEmpty()) {
-                            closeGroup(groupId)
+                        viewModelScope.launch {
+                            if (updatedMembers.isEmpty()) {
+                                closeGroup(groupId)
+                            }
                         }
                     }
                 }.addOnSuccessListener {

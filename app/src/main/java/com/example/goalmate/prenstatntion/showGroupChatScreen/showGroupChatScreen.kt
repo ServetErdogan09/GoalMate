@@ -1236,56 +1236,117 @@ fun PointsAnimationDialog(
             onDismissRequest = onDismiss,
             properties = DialogProperties(
                 dismissOnBackPress = true,
-                dismissOnClickOutside = true
+                dismissOnClickOutside = true,
+                usePlatformDefaultWidth = false
             )
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White)
+                    .fillMaxWidth(0.9f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        color = Color.White,
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (points > 0) {
+                            colorResource(id = R.color.yesil2).copy(alpha = 0.2f)
+                        } else {
+                            colorResource(id = R.color.pastelkirmizi).copy(alpha = 0.2f)
+                        },
+                        shape = RoundedCornerShape(24.dp)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Karakter görseli
-                    val imageRes = if (points > 0) R.drawable.happ else R.drawable.sady
-
+                    // Resim gösterimi
                     Image(
-                        painter = painterResource(id = imageRes),
+                        painter = painterResource(
+                            id = if (points > 0) R.drawable.happ else R.drawable.sady
+                        ),
                         contentDescription = null,
-                        modifier = Modifier.size(200.dp),
-                        contentScale = ContentScale.Fit
+                        modifier = Modifier
+                            .size(150.dp)
+                            .padding(bottom = 16.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Puan metni
+                    // Başlık
                     Text(
-                        text = if (points > 0) "+$points Puan" else "$points Puan",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = if (points > 0) colorResource(id = R.color.yesil2) else colorResource(id = R.color.pastelkirmizi),
-                        fontWeight = FontWeight.Bold
+                        text = if (points > 0) "Harika İş! 🎉" else "Üzgünüz! 😔",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (points > 0) {
+                            colorResource(id = R.color.yesil2)
+                        } else {
+                            colorResource(id = R.color.pastelkirmizi)
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Puan göstergesi
+                    Text(
+                        text = if (points > 0) "+$points" else "$points",
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = if (points > 0) {
+                            colorResource(id = R.color.yesil2)
+                        } else {
+                            colorResource(id = R.color.pastelkirmizi)
+                        }
+                    )
+
+                    Text(
+                        text = "PUAN",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colorResource(id = R.color.yazirengi).copy(alpha = 0.7f),
+                        letterSpacing = 2.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     // Açıklama metni
                     Text(
                         text = if (points > 0) {
-                            "Tebrikler! Alışkanlığını tamamladın ve puan kazandın! 🎉"
+                            "Alışkanlığını tamamladın ve puan kazandın!\nBöyle devam et!"
                         } else {
                             warningText()
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
-                        color = colorResource(id = R.color.yazirengi)
+                        color = colorResource(id = R.color.yazirengi),
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
 
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Tamam butonu
+                    Button(
+                        onClick = onDismiss,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (points > 0) {
+                                colorResource(id = R.color.yesil2)
+                            } else {
+                                colorResource(id = R.color.pastelkirmizi)
+                            }
+                        ),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Text(
+                            text = "Tamam",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
         }

@@ -102,7 +102,7 @@ data class RegistrationData(
     val birthMonth: String = "",
     val birthYear: String = "",
     val maxAllowedGroups :Int = 3,
-    val totalPoints: Int = 0,
+    val totalPoints: Int = 0
 )
 
 // Geçmiş silindiğinde kullanıcılacak
@@ -142,7 +142,9 @@ data class Group(
     val members: List<String> = emptyList(),
     val groupStatus: String = "WAITING", // WAITING, ACTIVE, CLOSED
     val startDeadline: Long = 0, // Grubun başlaması gereken son tarih
-    val actualStartDate: Long? = null // Grubun gerçekte başladığı tarih
+    val actualStartDate: Long? = null ,// Grubun gerçekte başladığı tarih,
+    val groupCompletedDays : Int = 0
+
 )
 
 // Her gurup için ayrı bir users koleksiyonun içinde tutulacak alt koleksiyon
@@ -151,7 +153,11 @@ data class GroupHabits(
     val completedDays : Int = 0,
     val uncompletedDays : Int = 0,
     val completedTime : Long = 0L,
+     val wasCompletedToday : Boolean = false
 )
+
+
+
 
 // Her kullanıcı için ayrı bir users koleksiyonun içinde tutulacak alt koleksiyon
 data class GroupHabitStats(
