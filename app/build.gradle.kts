@@ -67,6 +67,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.volley)
     implementation(libs.androidx.tools.core)
+    implementation(libs.androidx.media3.common.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -107,6 +108,10 @@ dependencies {
 
 
     implementation( "com.airbnb.android:lottie-compose:6.3.0")
+
+
+    implementation("io.github.ehsannarmani:compose-charts:0.1.2")
+
 
     // API 33 ve üzeri
     implementation( libs.accompanist.permissions)

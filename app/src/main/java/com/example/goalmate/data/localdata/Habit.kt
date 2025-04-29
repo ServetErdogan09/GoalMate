@@ -145,7 +145,8 @@ data class GroupHabits(
     val completedDays : Int = 0,
     val uncompletedDays : Int = 0,
     val completedTime : Long = 0L,
-     val wasCompletedToday : Boolean = false
+    val frequency : String = "günlük",
+    val wasCompletedToday : Boolean = false
 )
 
 

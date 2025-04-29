@@ -68,10 +68,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.example.goalmate.prenstatntion.BaseScreen.BaseScreen
 import com.example.goalmate.prenstatntion.RulesScreen.RulesScreen
 import com.example.goalmate.prenstatntion.ScoreBoard.ScoreBoardScreen
+import com.example.goalmate.prenstatntion.StatsScreen
 import com.example.goalmate.prenstatntion.showGroupChatScreen.ShowGroupChatScreen
 import com.example.goalmate.prenstatntion.viewProfile.ViewProfile
 import com.example.goalmate.presentation.badgesScreen.BadgesScreen
 import com.example.goalmate.viewmodel.BadgesViewModel
+import com.example.goalmate.viewmodel.HabitStatsViewModel
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 import com.example.goalmate.viewmodel.ScoreBoardViewModel
 
@@ -104,6 +106,7 @@ fun ChangingScreen() {
     val completeDayViewModel: CompleteDayViewModel = viewModel()
     val groupsAddViewModel : GroupsAddViewModel = viewModel()
     val motivationQuoteViewModel : MotivationQuoteViewModel = viewModel()
+    val habitStatsViewModel : HabitStatsViewModel = viewModel()
     val badgesViewModel : BadgesViewModel = viewModel()
     val context = LocalContext.current
     val auth = FirebaseAuth.getInstance()
@@ -186,6 +189,7 @@ fun ChangingScreen() {
                 currentRoute != "RulesScreen" &&
                 currentRoute != "WelcomeScreen" &&
                 currentRoute != "UserScreen" &&
+                currentRoute != "StatsScreen" &&
                 currentRoute != "BadgesScreen" &&
                 !currentRoute.startsWith("showGroupChatScreen") &&
                 !currentRoute.startsWith("ScoreBoardScreen") &&
@@ -202,6 +206,10 @@ fun ChangingScreen() {
 
             composable(route = "LoginScreen") {
                 LoginScreen(navController = navController, context = context)
+            }
+
+            composable(route ="StatsScreen"){
+                StatsScreen(navController = navController , habitStatsViewModel = habitStatsViewModel)
             }
 
             
@@ -408,7 +416,7 @@ fun BottomNavigationBar(navController: NavController) {
             BottomNavItem("HomeScreen", "Home", R.drawable.home),
             BottomNavItem("GroupListScreen", "Groups", R.drawable.groups),
             BottomNavItem("GroupAndPrivate", "Add", R.drawable.add),
-            BottomNavItem("Calendar", "Calendar", R.drawable.calendar),
+            BottomNavItem("StatsScreen", "Calendar", R.drawable.calendar),
             BottomNavItem("UserScreen", "Profile", R.drawable.profil)
         )
 
