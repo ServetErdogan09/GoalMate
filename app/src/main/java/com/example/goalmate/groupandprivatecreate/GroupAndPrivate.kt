@@ -150,7 +150,7 @@ fun GroupAndPrivate(
 
                 // History Section
                 item {
-                    if (!habitHistory.isEmpty() || !groupHabitHistory.isEmpty()) {
+                    if (habitHistory.isNotEmpty() || groupHabitHistory.isNotEmpty()) {
                         // Filter Chips
                         Column(
                             modifier = Modifier
@@ -221,21 +221,20 @@ fun GroupAndPrivate(
 
                 // History Content
                 if (showGroupHabits && groupHabitHistory.isNotEmpty()) {
-                    items(groupHabitHistory) { history ->
+                    items(groupHabitHistory.filter { it.habitType == "group" }) { history ->
                         HabitHistoryItem(habitHistory = history)
                     }
                 }
 
                 if (showNormalHabits && habitHistory.isNotEmpty()) {
-                    items(habitHistory) { history ->
+                    items(habitHistory.filter { it.habitType != "group" }) { history ->
                         HabitHistoryItem(habitHistory = history)
                     }
                 }
 
                 // Empty State
-                if (habitHistory.isEmpty() && groupHabitHistory.isEmpty() || 
-                    (showGroupHabits && groupHabitHistory.isEmpty()) || 
-                    (showNormalHabits && habitHistory.isEmpty())) {
+                if ((showGroupHabits && groupHabitHistory.none { it.habitType == "group" }) ||
+                    (showNormalHabits && habitHistory.none { it.habitType != "group" })) {
                     item {
                         Column(
                             modifier = Modifier

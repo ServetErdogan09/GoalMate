@@ -8,6 +8,9 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.goalmate.data.localdata.Group
+import com.example.goalmate.data.localdata.HabitHistory
+import com.example.goalmate.data.repository.HistoryHabitsRepository
+import com.example.goalmate.groupandprivatecreate.HabitHistoryItem
 import com.example.goalmate.prenstatntion.AnalysisScreen.totalHabit
 import com.example.goalmate.utils.Constants
 import com.example.goalmate.utils.NetworkUtils
@@ -22,6 +25,7 @@ import java.util.Calendar
 class ExpireGroupWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
+    private val historyHabitsRepository: HistoryHabitsRepository,
     private val db: FirebaseFirestore,
     private val auth: FirebaseAuth
 ) : CoroutineWorker(appContext, workerParams) {
@@ -73,6 +77,9 @@ class ExpireGroupWorker @AssistedInject constructor(
                        //  gurubu kapatmadan önce gurup başarı puanına bakıp puanları verelim
                         closeGroup(group.groupId)
                         Log.d("ExpireGroupWorker", "Grup ${group.groupId} kapatıldı")
+                    }else{
+                        Log.d("ExpireGroupWorker", "Grup $remainingDays kalan gün sayısı")
+
                     }
                 } catch (e: Exception) {
                     Log.e("ExpireGroupWorker", "Grup işlenirken hata: ${e.message}")
@@ -92,6 +99,9 @@ class ExpireGroupWorker @AssistedInject constructor(
             // Önce grup başarı oranını hesapla ve gerekirse bonus puanları dağıt
             calculateGroupSuccessRate(groupId)
 
+            var completedDays = 0
+
+
             // Önce tüm kullanıcıların joinedGroups listesinden bu grubu çıkar
             val usersSnapshot = db.collection("users").get().await()
             val batch = db.batch()
@@ -100,10 +110,16 @@ class ExpireGroupWorker @AssistedInject constructor(
                 val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: continue
                 if (groupId in joinedGroups) {
                     val userRef = db.collection("users").document(userDoc.id)
-                    batch.update(userRef, "joinedGroups", joinedGroups - groupId)
 
-                    // Kullanıcının groupHabits koleksiyonundan da sil
+                    // grouphabitsden veriyi alacağım
                     val groupHabitsRef = userRef.collection("groupHabits").document(groupId)
+                    val groupHabitsSnapshot = groupHabitsRef.get().await()  // Veriyi çekiyoruz
+
+                    if (groupHabitsSnapshot.exists()){
+                        completedDays = groupHabitsSnapshot.getLong("completedDays")?.toInt() ?:0
+                        Log.d("GroupHabitsData", "Group habits: $completedDays")
+                    }
+                    batch.update(userRef,"joinedGroups",joinedGroups-groupId)
                     batch.delete(groupHabitsRef)
                 }
             }
@@ -135,6 +151,39 @@ class ExpireGroupWorker @AssistedInject constructor(
             if (closeVoteRef.get().await().exists()) {
                 closeVoteRef.delete().await()
             }
+
+            val groupSnapshot = db.collection("groups")
+                .document(groupId)
+                .get()
+                .await()
+
+
+            val groupName = groupSnapshot.getString("groupName")?:""
+            val startDate = groupSnapshot.getLong("createdAt")?:0L
+            val frequency = groupSnapshot.getString("frequency") ?:""
+            val daysCompleted = completedDays
+            val habitType = "group"
+
+            val habitHistory = HabitHistory(
+                habitName = groupName,
+                startDate = startDate,
+                frequency = when (frequency.lowercase()) {
+                    "daily" -> "Günlük"
+                    "weekly" -> "Haftalık"
+                    "monthly" -> "Aylık"
+                    else -> "Günlük"
+                },
+                daysCompleted = daysCompleted,
+                habitType = habitType
+            )
+
+            // Ekleme işleminin sonucunu kontrol edelim
+            val insertResult = historyHabitsRepository.addGroupsNormal(habitHistory)
+            Log.d("ExpireGroupWorker", "Grup geçmişi ekleme sonucu: $insertResult")
+
+            // Ekleme sonrası grup sayısını kontrol edelim
+            val groupCount = historyHabitsRepository.getGroupCount()
+            Log.d("ExpireGroupWorker", "Güncel grup sayısı: $groupCount")
 
             // Son olarak grubu tamamen sil
             db.collection("groups")

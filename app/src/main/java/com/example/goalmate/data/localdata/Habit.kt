@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Index
 import com.example.goalmate.extrensions.RequestStatus
 import com.google.firebase.database.IgnoreExtraProperties
+import com.google.firebase.database.PropertyName
 
 @Entity(tableName = "habits")
 data class Habit(
@@ -32,12 +33,11 @@ data class Habit(
 @Entity(tableName = "habit_history")
 data class HabitHistory(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val habitName: String,               // Alışkanlık adı
-    val startDate: Long,                 // Başlangıç tarihi
-    val endDate: Long,                   // Bitiş tarihi
-    val frequency: String,               // Günlük, Haftalık, Aylık
-    val daysCompleted: Int,              // Tamamlanan gün sayısı
-    val habitType: String               // Alışkanlık türü (Grup ya da Normal)
+     val habitName: String, // Alışkanlık adı
+     val startDate: Long,  // Başlangıç tarihi
+     val frequency: String, // Günlük, Haftalık, Aylık
+     val daysCompleted: Int,              // Tamamlanan gün sayısı
+     val habitType: String               // Alışkanlık türü (Grup ya da Normal)
 
 )
 
@@ -103,14 +103,6 @@ data class RegistrationData(
     val birthYear: String = "",
     val maxAllowedGroups :Int = 3,
     val totalPoints: Int = 0
-)
-
-// Geçmiş silindiğinde kullanıcılacak
-data class GroupHabit(
-    val name : String ,
-    val startDate: Long,  // Başlangıç tarihi (milisaniye)
-    val finishDate: Long,  // Bitiş tarihi (milisaniye)
-    val completedDays: Int = 0,  // Tamamlanan gün sayısı
 )
 
 

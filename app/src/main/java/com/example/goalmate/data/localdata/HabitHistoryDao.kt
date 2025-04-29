@@ -36,10 +36,22 @@ interface HabitHistoryDao {
     """)
     suspend fun deleteOldestGroupHabitHistory()
 
+    // Debug amaçlı tüm kayıtları getir
+    @Query("SELECT * FROM habit_history ORDER BY startDate DESC")
+    suspend fun getAllHabitsForDebug(): List<HabitHistory>
 
+    // Grup alışkanlıkları için en son 10 kaydı al
+    @Query("""
+        SELECT * FROM habit_history 
+        WHERE habitType = 'group'
+        ORDER BY startDate DESC 
+        LIMIT 10
+    """)
+    fun getTop10GroupHabits(): Flow<List<HabitHistory>>
+
+    // Grup sayısını al
     @Query("SELECT COUNT(*) FROM habit_history WHERE habitType = 'group'")
     suspend fun getGroupHabitCount(): Int
-
 
     @Query("SELECT COUNT(*) FROM habit_history WHERE habitType = 'normal'")
     suspend fun getNormalHabitCount(): Int
@@ -49,16 +61,16 @@ interface HabitHistoryDao {
     suspend fun deleteOldHabitHistory(thirtyDaysAgo: Long)
 
     // Normal alışkanlıklar için en son 10 kaydı al
-    @Query("SELECT * FROM habit_history WHERE habitType ='normal' ORDER BY startDate DESC LIMIT 8")
+    @Query("""
+        SELECT * FROM habit_history 
+        WHERE habitType = 'normal'
+        ORDER BY startDate DESC 
+        LIMIT 10
+    """)
     fun getTop10NormalHabits(): Flow<List<HabitHistory>>
 
-    // Grup alışkanlıkları için en son 10 kaydı al
-    @Query("SELECT * FROM habit_history WHERE habitType ='group' ORDER BY startDate DESC LIMIT 8")
-    fun getTop10GroupHabits(): Flow<List<HabitHistory>>
-
     // Tüm alışkanlık geçmişini al
-    @Query("SELECT * FROM habit_history")
+    @Query("SELECT * FROM habit_history ORDER BY startDate DESC")
     fun getAllHabitHistory(): Flow<List<HabitHistory>>
-
 
 }

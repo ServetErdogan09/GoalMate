@@ -1,5 +1,6 @@
 package com.example.goalmate.data.repository
 
+import android.util.Log
 import com.example.goalmate.data.localdata.HabitHistory
 import com.example.goalmate.data.localdata.HabitHistoryDao
 import kotlinx.coroutines.flow.Flow
@@ -12,35 +13,43 @@ class HistoryHabitsRepository @Inject constructor(private val habitHistoryDao: H
         habitHistoryDao.deleteOldestNormalHabitHistory()
     }
 
-    suspend fun deleteOldestGroupHabitHistory() {
 
-        habitHistoryDao.deleteOldestNormalHabitHistory()
+    suspend fun deleteOldestGroupHabitHistory() {
+        habitHistoryDao.deleteOldestGroupHabitHistory()
     }
 
 
     suspend fun deleteOldHabitHistory(thirtyDaysAgo: Long) {
-        habitHistoryDao.
-        deleteOldHabitHistory(thirtyDaysAgo)
+        habitHistoryDao.deleteOldHabitHistory(thirtyDaysAgo)
     }
 
 
     fun getTop10NormalHabits() : Flow<List<HabitHistory>> {
-
         return habitHistoryDao.getTop10NormalHabits()
     }
 
 
     fun getTop10GroupHabits() : Flow<List<HabitHistory>> {
-
         return habitHistoryDao.getTop10GroupHabits()
     }
 
 
     //alışkanlık ekleme
     suspend fun addGroupsNormal(habitHistory: HabitHistory): Long {
+        Log.d("ExpireGroupWorker", "Grup geçmişi ekleniyor: $habitHistory")
         return habitHistoryDao.historyInsert(habitHistory)
     }
 
+    suspend fun getGroupCount(): Int {
+        return habitHistoryDao.getGroupHabitCount()
+    }
 
+    suspend fun getNormalCount(): Int {
+        return habitHistoryDao.getNormalHabitCount()
+    }
+
+    suspend fun getAllHabitsDebug(): List<HabitHistory> {
+        return habitHistoryDao.getAllHabitsForDebug()
+    }
 
 }

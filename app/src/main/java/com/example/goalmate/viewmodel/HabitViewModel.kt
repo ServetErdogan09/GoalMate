@@ -85,7 +85,7 @@ class HabitViewModel @Inject constructor(
     init {
         getServerTime()
         getCountActiveHabit()
-        Log.d("Constants", "MAX_HABIT_COUNT değeri: ${MAX_HABIT_COUNT}")
+        Log.d("Constants", "MAX_HABIT_COUNT değeri: $MAX_HABIT_COUNT")
         loadGroupRequests()
         // Eski verileri kontrol et
         checkExistingHabitsForFirestore()
@@ -428,28 +428,53 @@ class HabitViewModel @Inject constructor(
     fun insertHabitHistory(habitHistory: HabitHistory) {
         viewModelScope.launch {
             try {
-                Log.d("HabitAdd", "Alışkanlık başarıyla eklendi.")
+                // Önce mevcut kayıt sayısını kontrol et
+                val currentCount = historyHabitsRepository.getGroupCount()
+                Log.d("HabitAdd", "Mevcut grup kayıt sayısı: $currentCount")
+
+                // Yeni kaydı ekle
                 val habitHistoryId = historyHabitsRepository.addGroupsNormal(habitHistory)
-                historyHabitsRepository.getTop10NormalHabits().collect{normalHabits->
-                    if (normalHabits.size >= 10) {
-                        historyHabitsRepository.deleteOldestNormalHabitHistory()
-                    }
-                }
+                Log.d("HabitAdd", """
+                    Yeni kayıt eklendi:
+                    - ID: $habitHistoryId
+                    - İsim: ${habitHistory.habitName}
+                    - Tür: ${habitHistory.habitType}
+                    - Başlangıç: ${habitHistory.startDate}
+                    - Tamamlanan: ${habitHistory.daysCompleted}
+                """.trimIndent())
 
-                historyHabitsRepository.getTop10GroupHabits().collect{groupHabits->
-
-                    if (groupHabits.size >= 10){
+                // Kayıt limitini kontrol et ve gerekirse eski kayıtları sil
+                if (habitHistory.habitType.equals("Group", ignoreCase = true)) {
+                    val groupCount = historyHabitsRepository.getGroupCount()
+                    if (groupCount >= 10) {
                         historyHabitsRepository.deleteOldestGroupHabitHistory()
+                        Log.d("HabitAdd", "En eski grup kaydı silindi (limit aşıldı)")
+                    }
+                } else {
+                    val normalCount = historyHabitsRepository.getNormalCount()
+                    if (normalCount >= 10) {
+                        historyHabitsRepository.deleteOldestNormalHabitHistory()
+                        Log.d("HabitAdd", "En eski normal kayıt silindi (limit aşıldı)")
                     }
                 }
 
-                Log.d(
-                    "geçmişeklenen",
-                    "silinen alışkanlık geçmişe eklendi ID: $habitHistoryId, alıskanlık adı : ${habitHistory.habitName} ,   start : ${habitHistory.startDate}  finish : ${habitHistory.endDate} , dayscompleted : ${habitHistory.daysCompleted}  , isGroup : ${habitHistory.habitType} "
-                )
-            }catch (e : Exception){
-                _uiState.value =
-                    ExerciseUiState.Error("Alışkanlık eklenirken hata: ${e.message}")
+                // Ekleme sonrası güncel sayıyı kontrol et
+                val finalCount = historyHabitsRepository.getGroupCount()
+                Log.d("HabitAdd", "İşlem sonrası grup kayıt sayısı: $finalCount")
+
+                // Debug için tüm kayıtları kontrol et
+                val allHabits = historyHabitsRepository.getAllHabitsDebug()
+                Log.d("HabitAdd", """
+                    Veritabanındaki tüm kayıtlar:
+                    Toplam kayıt sayısı: ${allHabits.size}
+                    ${allHabits.joinToString("\n") { 
+                        "- ${it.habitName} (${it.habitType})" 
+                    }}
+                """.trimIndent())
+
+            } catch (e: Exception) {
+                Log.e("HabitAdd", "Hata: ${e.message}", e)
+                _uiState.value = ExerciseUiState.Error("Alışkanlık eklenirken hata: ${e.message}")
             }
         }
     }
@@ -474,18 +499,47 @@ class HabitViewModel @Inject constructor(
     fun getGroupHabitHistory() {
         viewModelScope.launch {
             try {
+                // Önce toplam kayıt sayısını kontrol et
+                val totalCount = historyHabitsRepository.getGroupCount()
+                Log.d("groupHistory", "Veritabanındaki toplam grup sayısı: $totalCount")
+
+                // Debug için tüm kayıtları kontrol et
+                val allHabits = historyHabitsRepository.getAllHabitsDebug()
+                Log.d("groupHistory", """
+                    Veritabanı durumu:
+                    Toplam kayıt: ${allHabits.size}
+                    Grup kayıtları: ${allHabits.count { it.habitType.equals("Group", ignoreCase = true) }}
+                    Normal kayıtlar: ${allHabits.count { it.habitType.equals("normal", ignoreCase = true) }}
+                """.trimIndent())
+
+                // Grup kayıtlarını al
                 historyHabitsRepository.getTop10GroupHabits().collect { history ->
                     _groupHabitHistory.value = history
+                    Log.d("groupHistory", """
+                        Sorgu sonucu:
+                        - Toplam kayıt: $totalCount
+                        - Dönen kayıt: ${history.size}
+                        - Boş mu: ${history.isEmpty()}
+                    """.trimIndent())
+
                     if (history.isNotEmpty()) {
-                        history.forEach {
-                            Log.d("group", "Habit Name: ${it.habitName}, Completed Days: ${it.daysCompleted}, id: ${it.id}, isGroup: ${it.frequency}")
+                        history.forEach { habit ->
+                            Log.d("groupHistory", """
+                                Grup detayı:
+                                - ID: ${habit.id}
+                                - İsim: ${habit.habitName}
+                                - Tür: ${habit.habitType}
+                                - Tamamlanan: ${habit.daysCompleted}
+                                - Frekans: ${habit.frequency}
+                                - Başlangıç: ${habit.startDate}
+                            """.trimIndent())
                         }
                     } else {
-                        Log.d("group", "Grup alışkanlıkları bulunamadı.")
+                        Log.d("groupHistory", "Grup alışkanlıkları bulunamadı. Veritabanı boş olabilir.")
                     }
                 }
             } catch (e: Exception) {
-                Log.e("historyError", "Group alışkanlıkları çağırırken hata verdi: ${e.message}")
+                Log.e("groupHistory", "Hata: ${e.message}", e)
             }
         }
     }
