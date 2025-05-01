@@ -66,9 +66,8 @@ class GroupsAddViewModel @Inject constructor(
     val groupListState = _groupListState.asStateFlow()
 
 
-    private val _totalPoint = MutableStateFlow<Int>(0)
-    val totalPoint : StateFlow<Int> = _totalPoint.asStateFlow()
 
+    val totalPoint : StateFlow<Int> = pointsRepository.userPoints
 
     private val _userNames = MutableStateFlow<Map<String, String>>(emptyMap())
     val userNames: StateFlow<Map<String, String>> = _userNames.asStateFlow()
@@ -205,6 +204,7 @@ class GroupsAddViewModel @Inject constructor(
                     completedDays = 0,
                     uncompletedDays = 0,
                     completedTime = currentTime,
+                    frequency = frequency,
                     wasCompletedToday = false
                 )
                 )
@@ -472,13 +472,7 @@ class GroupsAddViewModel @Inject constructor(
     fun  getTotalPoint(userId: String){
         viewModelScope.launch {
             try {
-                val totalPoint = db.collection("users")
-                    .document(userId)
-                    .get()
-                    .await()
-
-                val point = totalPoint.getLong("totalPoints")!!.toInt()
-                _totalPoint.value = point
+                pointsRepository.getUserPoints(userId)
             }catch (e:Exception){
                 Log.e("getTotalPoint","total point çekerken hata oluştu")
             }
@@ -489,14 +483,8 @@ class GroupsAddViewModel @Inject constructor(
     fun  getCurrentTotalPoint(){
         viewModelScope.launch {
             try {
-                val userId = auth.currentUser?.uid?:return@launch
-                val totalPoint = db.collection("users")
-                    .document(userId)
-                    .get()
-                    .await()
-
-                val point = totalPoint.getLong("totalPoints")!!.toInt()
-                _totalPoint.value = point
+            val currentId = auth.currentUser?.uid ?:return@launch
+                pointsRepository.getUserPoints(currentId)
             }catch (e:Exception){
                 Log.e("getTotalPoint","total point çekerken hata oluştu")
             }
@@ -519,10 +507,10 @@ class GroupsAddViewModel @Inject constructor(
                 val newPoints = pointsRepository.calculateAndUpdatePoints(
                     frequency = frequency,
                     isCompleted = isCompleted,
-                    isReversingPenalty = isReversingPenalty
+                    isReversingPenalty = isReversingPenalty,
+                    context
                 )
-                _totalPoint.value = newPoints
-                
+
                 Log.d("ScoreCalculation", "Yeni puan değeri: $newPoints")
             } catch (e: Exception) {
                 Log.e("ScoreCalculation", "Puan hesaplanırken hata oluştu", e)
@@ -547,11 +535,13 @@ class GroupsAddViewModel @Inject constructor(
                           // Kullanıcının groupHabits koleksiyonundan da sil
                           val groupHabitsRef = userRef.collection("groupHabits").document(groupId)
                           batch.delete(groupHabitsRef)
+                          Log.d("GroupClose", "Deleting groupHabits for user ${userDoc.id}")
                       }
                   }
 
                   // Batch işlemini tamamla
                   batch.commit().await()
+                  Log.d("GroupClose", "Successfully removed group from users and deleted groupHabits")
 
                   // Grubun mesajlarını sil
                   val messagesSnapshot = db.collection("groups")
@@ -566,6 +556,7 @@ class GroupsAddViewModel @Inject constructor(
                           messageBatch.delete(doc.reference)
                       }
                       messageBatch.commit().await()
+                      Log.d("GroupClose", "Successfully deleted all messages")
                   }
 
                   // Grubun oylama verilerini sil
@@ -576,6 +567,7 @@ class GroupsAddViewModel @Inject constructor(
 
                   if (closeVoteRef.get().await().exists()) {
                       closeVoteRef.delete().await()
+                      Log.d("GroupClose", "Successfully deleted vote data")
                   }
 
                   // Son olarak grubu tamamen sil
@@ -584,9 +576,9 @@ class GroupsAddViewModel @Inject constructor(
                       .delete()
                       .await()
 
-                  Log.d("ExpireGroupWorker", "Grup $groupId ve ilişkili tüm veriler başarıyla silindi")
+                  Log.d("GroupClose", "Group $groupId and all related data successfully deleted")
               } catch (e: Exception) {
-                  Log.e("ExpireGroupWorker", "Grup silinirken hata: ${e.message}")
+                  Log.e("GroupClose", "Error while closing group: ${e.message}")
                   throw e
               }
           }
@@ -1176,6 +1168,7 @@ class GroupsAddViewModel @Inject constructor(
                 .await()
 
             if (groupAdminId != null) {
+                /*
                 sendNotificationToAdmin(
                     adminId = groupAdminId,
                     userName = userName,
@@ -1184,6 +1177,8 @@ class GroupsAddViewModel @Inject constructor(
                     groupId = groupId,
                     userId = userId
                 )
+
+                 */
             }
 
             _joinGroupState.value = "Katılım isteği gönderildi"
@@ -1194,31 +1189,7 @@ class GroupsAddViewModel @Inject constructor(
     }
 
 
-    // eğer alışkanlıklar tamamlandıysa bunlarda ekleme yapılacak
-    suspend fun updateGroupStats(frequency: String){
-        try {
-            val currentUserId = auth.currentUser?.uid ?:return
-            val userRef = db.collection("users").document(currentUserId)
-            val statsRef = userRef.collection("stats").document("habitStats")
 
-
-            db.runTransaction {transaction->
-                val currentStates = transaction.get(statsRef).toObject<GroupHabitStats>() ?:GroupHabitStats()
-                val updatedStats = when(frequency){
-                    "Günlük" -> currentStates.copy(dailyGroupsCompleted = currentStates.dailyGroupsCompleted + 1)
-                    "Haftalık"-> currentStates.copy(weeklyGroupsCompleted = currentStates.weeklyGroupsCompleted + 1 )
-                    "Aylık"-> currentStates.copy(monthlyGroupsCompleted = currentStates.monthlyGroupsCompleted + 1)
-                    else -> currentStates
-                }
-
-                transaction.set(statsRef, updatedStats, SetOptions.merge())
-
-            }.await()
-
-        }catch (e:Exception){
-            Log.e("GroupStats", "Error updating group stats", e)
-        }
-    }
 
     private suspend fun sendNotificationToAdmin(
         adminId: String,
@@ -1520,10 +1491,11 @@ class GroupsAddViewModel @Inject constructor(
                 }
                 
                 Log.d("OylamaBaslatma", "Grup üye sayısı: ${group.members.size}")
-                
+
                 val currentServerTime = NetworkUtils.getTime(context = context)
                 val votingEndTime = currentServerTime + (24 * 60 * 60 * 1000)
-                
+
+
                 Log.d("OylamaBaslatma", "Oylama bitiş zamanı: ${formatTimestampForLog(votingEndTime)}")
                 
                 // Oylama verilerini hazırla
@@ -1658,41 +1630,73 @@ class GroupsAddViewModel @Inject constructor(
     @RequiresApi(Build.VERSION_CODES.O)
     private fun scheduleVoteCheck(groupId: String, votingEndTime: Long , context: Context) {
         viewModelScope.launch {
-            val currentServerTime = NetworkUtils.getTime(context = context)
             try {
+                val currentServerTime = NetworkUtils.getTime(context = context)
+               // val currentServerTime = System.currentTimeMillis() // test amaçlı
+
                 val delayMillis = votingEndTime - currentServerTime
+                
                 if (delayMillis > 0) {
-                    kotlinx.coroutines.delay(delayMillis)
-                    checkVoteResult(groupId)
+                    Log.d("VoteCheck", "Oylama kontrolü zamanlandı: ${delayMillis}ms sonra")
+                    delay(delayMillis)
+                    checkVoteResult(groupId, context)
+                } else {
+                    Log.d("VoteCheck", "Oylama süresi zaten geçmiş, hemen kontrol ediliyor")
+                    checkVoteResult(groupId, context)
                 }
             } catch (e: Exception) {
-                Log.e("GroupClose", "Error scheduling vote check", e)
+                Log.e("VoteCheck", "Oylama kontrolü zamanlanırken hata: ${e.message}")
             }
         }
     }
 
-    private suspend fun checkVoteResult(groupId: String) {
+    @RequiresApi(Build.VERSION_CODES.O)
+    private suspend fun checkVoteResult(groupId: String, context: Context) {
         try {
+            Log.d("VoteCheck", "Oylama sonucu kontrol ediliyor - Grup ID: $groupId")
+            
             val voteRef = db.collection("groups").document(groupId)
                 .collection("closeVote").document("status")
             val voteDoc = voteRef.get().await()
             
             if (voteDoc.exists()) {
-                val yesVotes = voteDoc.getLong("yesVotes")?.toInt() ?: 0
-                val noVotes = voteDoc.getLong("noVotes")?.toInt() ?: 0
-                val totalMembers = voteDoc.getLong("totalMembers")?.toInt() ?: 0
+                val currentServerTime = NetworkUtils.getTime(context = context)
+                val votingEndTime = voteDoc.getLong("votingEndTime") ?: 0
                 
-                // Eğer evet oyları çoğunluktaysa grubu kapat
-                if (yesVotes > noVotes && yesVotes > totalMembers / 2) {
-                    closeGroup(groupId)
+                // Oylama süresi dolmuş mu kontrol et
+                if (currentServerTime >= votingEndTime) {
+                    val yesVotes = voteDoc.getLong("yesVotes")?.toInt() ?: 0
+                    val noVotes = voteDoc.getLong("noVotes")?.toInt() ?: 0
+                    val totalMembers = voteDoc.getLong("totalMembers")?.toInt() ?: 0
+                    
+                    Log.d("VoteCheck", """
+                        Oylama sonuçları:
+                        - Evet: $yesVotes
+                        - Hayır: $noVotes
+                        - Toplam Üye: $totalMembers
+                    """.trimIndent())
+                    
+                    // Eğer evet oyları çoğunluktaysa ve toplam üyelerin yarısından fazlaysa grubu kapat
+                    if (yesVotes > noVotes && yesVotes > totalMembers / 2) {
+                        Log.d("VoteCheck", "Oylama sonucu: Grup kapatılıyor")
+                        closeGroup(groupId)
+                    } else {
+                        Log.d("VoteCheck", "Oylama sonucu: Grup kapatılmıyor (yeterli oy yok)")
+                    }
+                    
+                    // Oylama dokümanını sil ve state'i temizle
+                    voteRef.delete().await()
+                    _groupCloseVoteState.value -= groupId
+                    
+                    Log.d("VoteCheck", "Oylama dokümanı silindi ve state temizlendi")
+                } else {
+                    Log.d("VoteCheck", "Oylama süresi henüz dolmamış")
                 }
-                
-                // Oylama sonuçlarını arşivle ve state'i temizle
-                voteRef.delete()
-                _groupCloseVoteState.value -= groupId
+            } else {
+                Log.d("VoteCheck", "Oylama dokümanı bulunamadı")
             }
         } catch (e: Exception) {
-            Log.e("GroupClose", "Error checking vote result", e)
+            Log.e("VoteCheck", "Oylama sonucu kontrol edilirken hata: ${e.message}")
         }
     }
 
@@ -1734,6 +1738,16 @@ class GroupsAddViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e("VoteState", "Error setting up vote state listener", e)
             }
+        }
+    }
+
+    suspend fun getUserPoints(userId: String): Int {
+        return try {
+            val userDoc = db.collection("users").document(userId).get().await()
+            userDoc.getLong("totalPoints")?.toInt() ?: 0
+        } catch (e: Exception) {
+            Log.e("GroupsAddViewModel", "Error fetching user points", e)
+            0
         }
     }
 

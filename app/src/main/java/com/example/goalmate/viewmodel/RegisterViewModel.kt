@@ -48,6 +48,7 @@ import com.example.goalmate.data.repository.PointsRepository
 class RegisterViewModel @Inject constructor(
     private val auth: FirebaseAuth,
     private val db: FirebaseFirestore,
+   private val pointsRepository: PointsRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
     private val _registrationData = MutableStateFlow(RegistrationData())
@@ -56,13 +57,9 @@ class RegisterViewModel @Inject constructor(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-
-
     // Kayıt aşamasını takip etmek için
     private val _currentStep = MutableStateFlow(RegistrationStep.EMAIL_PASSWORD)
     val currentStep: StateFlow<RegistrationStep> = _currentStep.asStateFlow()
-
-
 
     private val _verificationState = MutableStateFlow<VerificationState>(VerificationState.Idle)
     val verificationState = _verificationState.asStateFlow()
@@ -74,10 +71,8 @@ class RegisterViewModel @Inject constructor(
     private val _profileImage = MutableStateFlow<String>("")
     val profileImage: StateFlow<String> = _profileImage.asStateFlow()
 
-
     private val _maxAllowedGroups  = MutableStateFlow<Int>(2)
     val maxAllowedGroups : StateFlow<Int> = _maxAllowedGroups.asStateFlow()
-
 
     private val _showPasswordDialog = MutableStateFlow(false)
     val showPasswordDialog: StateFlow<Boolean> = _showPasswordDialog.asStateFlow()
@@ -89,15 +84,24 @@ class RegisterViewModel @Inject constructor(
     private val _joinedGroupsCount = MutableStateFlow(0)
     val joinedGroupsCount: StateFlow<Int> = _joinedGroupsCount.asStateFlow()
 
+
+    val userPoints: StateFlow<Int> = pointsRepository.userPoints
+
     init {
         _userName.value = getLocalUserName(context)
         checkCurrentUser()
         getCurrentUser(context)
 
         auth.currentUser?.let {user->
-            listenToUserNameChanges(user.uid, context)
+            viewModelScope.launch {
+                listenToUserNameChanges(user.uid, context)
+                pointsRepository.listenToPointChanges(user.uid,context)
+                pointsRepository.initializeUserPoints(context)
+            }
+
         }
     }
+
 
     fun getCurrentUser(context: Context) {
         viewModelScope.launch {
@@ -213,7 +217,6 @@ class RegisterViewModel @Inject constructor(
             }
     }
 
-    // Local'den kullanıcı adını al
     private fun getLocalUserName(context: Context): String {
         val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
         return sharedPreferences.getString("user_name", "Misafir") ?: "Misafir"
@@ -237,8 +240,6 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
-
-
 
     fun updateEmail(email: String) {
         Log.d("RegisterViewModel", "Updating email to: $email")
@@ -274,10 +275,6 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
-
-
-
-    
 
     fun updateName(name: String) {
         Log.d("RegisterViewModel", "Updating name to: $name")
@@ -444,8 +441,6 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-
-    // guruba katılma code oluşturacak
     fun createGroupCode(groupId: String) {
        val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
        val newCode =  (1..8).map { chars.random() }.joinToString("")
@@ -501,12 +496,13 @@ class RegisterViewModel @Inject constructor(
                                 "createdAt" to System.currentTimeMillis(),
                                 "joinedGroups" to listOf<String>(),
                                 "fcmToken" to fcmToken,
-                                "maxAllowedGroups" to 3 ,
+                                "maxAllowedGroups" to 3,
                                 "totalPoints" to 0
                             )
 
                             // Ana kullanıcı dökümanını oluştur
                             transaction.set(userRef, userData)
+                               pointsRepository.saveUserPointsToLocal(context,0)
 
                             // GroupHabitStats alt koleksiyonunu oluştur
                             val statsRef = userRef.collection("stats").document("habitStats")
@@ -561,8 +557,6 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
-
-
 
     fun updateProfileImage(imageUri: String, context: Context) {
         viewModelScope.launch(Dispatchers.IO + SupervisorJob()) {
@@ -700,7 +694,6 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-
     private fun deleteUserPref(context: Context){
         val sharedPreferences =  context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
         sharedPreferences.edit() { clear() }
@@ -783,7 +776,6 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-
     fun signOut(context: Context) {
         viewModelScope.launch {
             try {
@@ -817,8 +809,6 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-
-
     // Kullanıcının grup sayılarını günceller
     suspend fun updateUserGroupCounts(userId: String) {
         try {
@@ -842,8 +832,6 @@ class RegisterViewModel @Inject constructor(
         }
     }
 
-
-
     fun canJoinMoreGroups(): Boolean {
         val currentCount = _joinedGroupsCount.value
         val maxAllowed = _maxAllowedGroups.value
@@ -858,12 +846,7 @@ class RegisterViewModel @Inject constructor(
         
         return canJoin
     }
-
 }
-
-
-
-
 
 sealed class VerificationState {
     object Idle : VerificationState()

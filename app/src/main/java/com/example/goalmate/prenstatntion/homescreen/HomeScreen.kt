@@ -97,6 +97,8 @@ import android.content.pm.PackageManager
 import android.app.Activity
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.material.Text
+import androidx.compose.material3.RadioButtonDefaults.colors
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -126,7 +128,7 @@ fun HomeScreen(
     }
 
     val userName by registerViewModel.userName.collectAsState()
-    val totalPoint = groupsAddViewModel.totalPoint.collectAsState().value
+    val totalPoint = registerViewModel.userPoints.collectAsState().value
     val profileImage by registerViewModel.profileImage.collectAsState()
 
 
@@ -642,11 +644,6 @@ fun HomeScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
-                            Image(
-                                painter = painterResource(R.drawable.empty),
-                                contentDescription = "",
-                                modifier = Modifier.size(350.dp)
-                            )
                         }
                     }
 
@@ -1052,7 +1049,6 @@ fun CustomAlertDialog(
                         val habitHistory = HabitHistory(
                             habitName = habit.name,
                             startDate = habit.startDate,
-                            endDate = habit.finishDate,
                             frequency = habit.frequency,
                             daysCompleted = habit.completedDays,
                             habitType = habit.habitType
@@ -1452,6 +1448,44 @@ fun RequestItem(
         }
     }
 }
+
+
+
+@Composable
+fun PointColor(modifier: Modifier, userPoint: Int) {
+    val ranks = listOf(
+        "Acemi" to Color(0xFF48C9B0),
+        "Başlangıç" to Color(0xFF5DADE2),
+        "Çaylak" to Color(0xFF9B59B6),
+        "Disiplinli" to Color(0xFFF4D03F),
+        "Kararlı" to Color(0xFFE74C3C),
+        "Usta" to Color(0xFF2ECC71),
+        "Bilge" to Color(0xFF8E44AD),
+        "Efsane" to Color(0xFFFFD700)
+    )
+
+    // Rank'e göre rengi bul
+    val pointColor = ranks.find { it.first.equals(Constants.getRankFromPoints(userPoint), ignoreCase = true) }?.second ?: colorResource(R.color.kutubordrengi)
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(horizontal = 8.dp)
+    ) {
+        Text(
+            text = userPoint.toString(),
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = pointColor
+        )
+        Text(
+            text = "point",
+            fontSize = 13.sp,
+            color = pointColor,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+ }
+
 
 
 

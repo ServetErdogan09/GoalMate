@@ -49,6 +49,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.goalmate.R
 import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.data.localdata.HabitFirebase
+import com.example.goalmate.prenstatntion.homescreen.PointColor
 import com.example.goalmate.prenstatntion.homescreen.RankBadge
 import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.example.goalmate.utils.Constants
@@ -74,7 +75,7 @@ fun ViewProfile(
     val userName = userNames[userId] ?: "Yükleniyor..."
     val profileImage = profileImages[userId] ?: ""
 
-    val totalPoint = groupsAddViewModel.totalPoint.collectAsState().value
+    var userPoint by remember { mutableStateOf(0) }
 
     // State for user's groups
     var userGroups by remember { mutableStateOf<List<Group>>(emptyList()) }
@@ -83,13 +84,13 @@ fun ViewProfile(
     var joinDate by remember { mutableStateOf("01.01.2023") }
     var selectedTab by remember { mutableStateOf(0) }
 
-
-
     // firestoreden verileri çek
     LaunchedEffect(userId) {
         groupsAddViewModel.getUsersName(userId)
         groupsAddViewModel.getProfile(userId)
-        groupsAddViewModel.getTotalPoint(userId)
+        
+        // Kullanıcının puanını çek
+        userPoint = groupsAddViewModel.getUserPoints(userId)
 
         val db = FirebaseFirestore.getInstance()
 
@@ -183,33 +184,16 @@ fun ViewProfile(
                     }
 
 
+
                     Text(
-                        text = buildAnnotatedString {
-                            withStyle(
-                                style = SpanStyle(
-                                    fontSize = 22.sp, // Kullanıcının ismi boyutu
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily(Font(R.font.noto_regular)),
-                                    color = colorResource(id = R.color.yazirengi)
-                                )
-                            ) {
-                                append(userName)
-                                append(" ")
-                            }
-                            withStyle(
-                                style = SpanStyle(
-                                    fontSize = 15.sp, // Sonsuzluk işaretinin ayrı büyük boyutu
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily(Font(R.font.noto_regular)),
-                                    color = colorResource(id = R.color.yazirengi)
-                                )
-                            ) {
-                                append("∞")
-                            }
-                        },
+                       text = userName,
+                        fontSize = 22.sp, // Kullanıcının ismi boyutu
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily(Font(R.font.noto_regular)),
+                        color = colorResource(id = R.color.yazirengi),
                         modifier = Modifier.padding(start = 10.dp, top = 30.dp)
                     )
-                    RankBadge(rank = Constants.getRankFromPoints(totalPoint) , modifier = Modifier.padding(start = 10.dp , top = 30.dp))
+                    RankBadge(rank = Constants.getRankFromPoints(userPoint) , modifier = Modifier.padding(start = 10.dp , top = 30.dp))
 
 
                 }
@@ -313,11 +297,7 @@ fun ViewProfile(
                                                 .width(1.dp)
                                                 .background(colorResource(id = R.color.kutubordrengi).copy(alpha = 0.2f))
                                         )
-                                        StatItem(
-                                            value ="$totalPoint",
-                                            label = "Point",
-                                            valueColor = colorResource(id = R.color.yildiz)
-                                        )
+                                        PointColor(modifier = Modifier ,userPoint )
                                     }
                                 }
                             }
