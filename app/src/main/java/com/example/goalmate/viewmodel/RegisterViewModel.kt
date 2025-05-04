@@ -509,7 +509,10 @@ class RegisterViewModel @Inject constructor(
                             transaction.set(statsRef, GroupHabitStats(
                                 dailyGroupsCompleted = 0,
                                 weeklyGroupsCompleted = 0,
-                                monthlyGroupsCompleted = 0
+                                monthlyGroupsCompleted = 0,
+                                adminCompletedGroups = 0,
+                                kickedMemberCount = 0,
+                                appUsageDays = 0
                             ))
 
                             // BadgesId alt koleksiyonunu oluştur

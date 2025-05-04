@@ -29,6 +29,7 @@ import androidx.annotation.RequiresApi
 import com.example.goalmate.data.localdata.GroupCloseVoteState
 import com.example.goalmate.data.localdata.GroupHabitStats
 import com.example.goalmate.data.localdata.GroupHabits
+import com.example.goalmate.data.repository.BadgesRepository
 import com.example.goalmate.data.repository.PointsRepository
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.toObject
@@ -43,7 +44,8 @@ import android.content.Context as AndroidContext
 class GroupsAddViewModel @Inject constructor(
     private val db: FirebaseFirestore,
     private val auth: FirebaseAuth,
-    private val pointsRepository: PointsRepository
+    private val pointsRepository: PointsRepository,
+    private val  badgesRepository: BadgesRepository
 ) : ViewModel() {
 
     private val _groupCreationState =
@@ -136,6 +138,8 @@ class GroupsAddViewModel @Inject constructor(
                     GroupCreationState.Failure("Kullanıcı oturumu bulunamadı")
                 return null
             }
+
+            badgesRepository.createGroup()
 
             // Kullanıcının mevcut grup sayısını ve limitini kontrol et
             val userDoc = db.collection("users").document(currentUserId).get().await()
@@ -233,6 +237,8 @@ class GroupsAddViewModel @Inject constructor(
                 actualStartDate = null
 
             )
+
+
 
             val currentGroups =
                 (_groupListState.value as? GroupListState.Success)?.groups ?: emptyList()
@@ -895,6 +901,7 @@ class GroupsAddViewModel @Inject constructor(
                         getProfile(userId)
                         _joinGroupState.value =
                             "Tebrikler! 🎉 Grubumuza katıldınız, şimdi hep birlikte daha güçlüyüz!"
+                        badgesRepository.createGroup()
                     }
                 }.addOnFailureListener { e ->
                     Log.e("Firestore", "Error joining group", e)
@@ -923,6 +930,7 @@ class GroupsAddViewModel @Inject constructor(
                 if (document != null && document.exists()) {
                     val photoUrl = document.getString("profileImage") ?: ""
                     _profileImages.value += (userId to photoUrl)
+
                 }
             } catch (e: Exception) {
                 Log.w("UserPhoto", "Kullanıcı verisi çekilemedi", e)

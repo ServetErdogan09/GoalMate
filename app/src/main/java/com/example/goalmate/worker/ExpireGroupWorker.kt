@@ -9,6 +9,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.goalmate.data.localdata.Group
 import com.example.goalmate.data.localdata.HabitHistory
+import com.example.goalmate.data.repository.BadgesRepository
 import com.example.goalmate.data.repository.HistoryHabitsRepository
 import com.example.goalmate.groupandprivatecreate.HabitHistoryItem
 import com.example.goalmate.prenstatntion.AnalysisScreen.totalHabit
@@ -27,6 +28,7 @@ class ExpireGroupWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val historyHabitsRepository: HistoryHabitsRepository,
     private val db: FirebaseFirestore,
+    private val badgesRepository: BadgesRepository,
     private val auth: FirebaseAuth
 ) : CoroutineWorker(appContext, workerParams) {
 
@@ -98,6 +100,7 @@ class ExpireGroupWorker @AssistedInject constructor(
         try {
             // Önce grup başarı oranını hesapla ve gerekirse bonus puanları dağıt
             calculateGroupSuccessRate(groupId)
+            completedGroup(groupId)
 
             var completedDays = 0
 
@@ -237,12 +240,109 @@ class ExpireGroupWorker @AssistedInject constructor(
                     batch.commit().await()
                     Log.d("ExpireGroupWorker", "Bonus puanlar dağıtıldı: +$bonusPoints puan")
                 }
+                
             }
             
             Log.d("ExpireGroupWorker", "Grup başarı oranı: $successRate%")
         } catch (e: Exception) {
             Log.e("ExpireGroupWorker", "Grup başarı oranı hesaplanırken hata: ${e.message}")
             throw e
+        }
+    }
+
+
+
+    suspend fun completedGroup(groupId: String){
+        try {
+            // Grup dokümanını Firestore'dan çek
+            val groupDoc = db.collection("groups").document(groupId).get().await()
+
+            val createdBy = groupDoc.getString("createdBy") ?:""
+
+
+            // Grup sıklığını ve üye listesini al
+            val groupFrequency = groupDoc.getString("frequency")?.lowercase() ?: ""
+            val memberList = groupDoc.get("members") as? List<String> ?: emptyList()
+
+            val batch = db.batch() // Toplu güncelleme işlemi başlatılır
+
+            for (userId in memberList) {
+                val userRef = db.collection("users").document(userId)
+                val statsRef = userRef.collection("stats").document("habitStats")
+
+                // Kullanıcının mevcut istatistiklerini al
+                val statsDoc = statsRef.get().await()
+
+                if (statsDoc.exists()) {
+                    // Eğer doküman varsa, sıklığa göre değeri bir artır
+                    when (groupFrequency) {
+                        "günlük" -> {
+                            val currentDaily = statsDoc.getLong("dailyGroupsCompleted")?.toInt() ?: 0
+                            batch.update(statsRef, "dailyGroupsCompleted", currentDaily + 1)
+
+                        }
+                        "haftalık" -> {
+                            val currentWeekly = statsDoc.getLong("weeklyGroupsCompleted")?.toInt() ?: 0
+                            val adminCompletedGroups = statsDoc.getLong("adminCompletedGroups")?.toInt() ?: 0
+                            batch.update(statsRef, "weeklyGroupsCompleted", currentWeekly + 1)
+                            batch.update(statsRef, "adminCompletedGroups", adminCompletedGroups + 1)
+                        }
+                        "aylık" -> {
+                            val currentMonthly = statsDoc.getLong("monthlyGroupsCompleted")?.toInt() ?: 0
+                            val adminCompletedGroups = statsDoc.getLong("adminCompletedGroups")?.toInt() ?: 0
+
+                            batch.update(statsRef, "adminCompletedGroups", adminCompletedGroups + 1)
+                            batch.update(statsRef, "monthlyGroupsCompleted", currentMonthly + 1)
+                        }
+
+                    }
+
+                    val dailyGroupCount = statsDoc.getLong("dailyGroupsCompleted")?.toInt() ?: 0
+                    val weeklyGroupCount = statsDoc.getLong("weeklyGroupsCompleted")?.toInt() ?: 0
+                    val monthlyGroupCount = statsDoc.getLong("monthlyGroupsCompleted")?.toInt() ?: 0
+
+                    val adminCompletedGroups = statsDoc.getLong("adminCompletedGroups")?.toInt() ?: 0
+
+
+                    val currentId = auth.currentUser?.uid
+
+
+                    // BadgesRepository'den rozetleri kontrol et
+                  badgesRepository.checkGroupCompletionBadges(
+                        dailyGroupCount = dailyGroupCount,
+                        weeklyGroupCount = weeklyGroupCount,
+                        monthlyGroupCount = monthlyGroupCount
+                    )
+
+                    badgesRepository.checkLimitIncreaseBadges(
+                        weeklyGroupCount = weeklyGroupCount,
+                        monthlyGroupCount = monthlyGroupCount
+                    )
+
+                    if (currentId == createdBy)
+                    badgesRepository.checkAdminBadges(
+                        isAdmin = true,
+                        adminCompletedGroups = adminCompletedGroups,
+                        kickedMemberCount = 0
+                    )
+
+                } else {
+                    // Eğer istatistik dokümanı yoksa, yeni bir doküman oluştur
+                    val initialStats = mapOf(
+                        "dailyGroupsCompleted" to if (groupFrequency == "günlük") 1 else 0,
+                        "weeklyGroupsCompleted" to if (groupFrequency == "haftalık") 1 else 0,
+                        "monthlyGroupsCompleted" to if (groupFrequency == "aylık") 1 else 0
+                    )
+                    batch.set(statsRef, initialStats)
+                }
+            }
+
+            // Tüm batch işlemlerini Firestore'a gönder
+            batch.commit().await()
+            Log.d("ExpireGroupWorker", "Grup tamamlama istatistikleri güncellendi")
+
+        } catch (e: Exception) {
+            Log.e("ExpireGroupWorker", "Kullanıcı rozetlerini eklerken hata oluştu: ${e.message}")
         }
     }
 

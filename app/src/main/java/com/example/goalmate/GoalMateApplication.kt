@@ -154,7 +154,7 @@ class GoalMateApplication : Application(), Configuration.Provider {
 
             // Periyodik worker oluştur (10 dakikada bir)
             val periodicCheck = PeriodicWorkRequestBuilder<GroupStatusWorker>(
-                3, TimeUnit.MINUTES, // Her 3 SAAT bir kontrol
+                12, TimeUnit.HOURS, // Her 12 SAAT bir kontrol
                 30, TimeUnit.MINUTES  // 30 dakika esneklik payı
             )
                 .setConstraints(
@@ -188,13 +188,27 @@ class GoalMateApplication : Application(), Configuration.Provider {
 // kalan gün sayısı 1 olduğunda gece yarısı çalışıp gurubu kapatacak
     private fun setupExpireGroupWorker() {
         try {
+
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
+
+
+            //DENEME
+            val oneTimeWorkRequest = OneTimeWorkRequestBuilder<ExpireGroupWorker>()
+                .setInitialDelay(0, TimeUnit.MILLISECONDS) // Hemen çalışacak
+                .build()
+
+            WorkManager.getInstance(applicationContext).enqueue(oneTimeWorkRequest)
+
+
+
+
+            /*
             // Her gün gece yarısı çalışacak periyodik worker  24 SAATE BİR ÇALIŞACAK
             val periodicWork = PeriodicWorkRequestBuilder<ExpireGroupWorker>(
-                24, TimeUnit.HOURS
+                24, TimeUnit.HOURS // TEST AMAÇLI 15 DK YA ÇEKİLDİ
             )
                 .setConstraints(constraints)
                 .setInitialDelay(calculateInitialDelay(), TimeUnit.MILLISECONDS)
@@ -205,6 +219,12 @@ class GoalMateApplication : Application(), Configuration.Provider {
                 ExistingPeriodicWorkPolicy.KEEP,
                 periodicWork
             )
+
+             */
+
+
+
+
 
             Log.d("WorkManager", "ExpireGroupWorker başarıyla ayarlandı")
         } catch (e: Exception) {

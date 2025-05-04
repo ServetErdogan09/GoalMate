@@ -137,8 +137,8 @@ object ExerciseModule {
 
     @Provides
     @Singleton
-    fun provideBadgesRepository(badgesDao: BadgesDao) : BadgesRepository{
-        return BadgesRepository(badgesDao)
+    fun provideBadgesRepository(badgesDao: BadgesDao ,db : FirebaseFirestore , auth : FirebaseAuth , @ApplicationContext context: Context) : BadgesRepository{
+        return BadgesRepository(badgesDao ,db , auth ,context)
     }
 }
 

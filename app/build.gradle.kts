@@ -28,6 +28,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -110,7 +111,12 @@ dependencies {
     implementation( "com.airbnb.android:lottie-compose:6.3.0")
 
 
+    //DataStore locale verileri kaydedeceğiz
+  //  implementation("androidx.datastore:datastore-preferences:1.1.5")
+
     implementation("io.github.ehsannarmani:compose-charts:0.1.2")
+
+
 
 
     // API 33 ve üzeri

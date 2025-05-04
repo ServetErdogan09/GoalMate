@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 import androidx.room.Index
 import com.example.goalmate.extrensions.RequestStatus
+import com.google.api.Billing
 import com.google.firebase.database.IgnoreExtraProperties
 import com.google.firebase.database.PropertyName
 
@@ -47,6 +48,7 @@ data class Badges(
     val iconId: String? = null,
     val ad : String,
     val description: String,
+    val isShown : Boolean,
     val isCompleted: Boolean,
     val category: String // GROUP_COMPLETION, LIMIT_INCREASE, ADMIN, GENERAL_ACHIEVEMENT, APP_USAGE
 )
@@ -156,7 +158,10 @@ data class GroupHabits(
 data class GroupHabitStats(
   val dailyGroupsCompleted : Int = 0,
   val weeklyGroupsCompleted : Int = 0,
-  val monthlyGroupsCompleted : Int = 0
+  val monthlyGroupsCompleted : Int = 0,
+  val adminCompletedGroups : Int = 0,
+  val kickedMemberCount : Int = 0,
+  val appUsageDays : Int = 0
 )
 
 
