@@ -84,6 +84,7 @@ fun ViewProfile(
     var joinDate by remember { mutableStateOf("01.01.2023") }
     var selectedTab by remember { mutableStateOf(0) }
 
+    Log.e("userId","$userId çekilen ıd")
     // firestoreden verileri çek
     LaunchedEffect(userId) {
         groupsAddViewModel.getUsersName(userId)
@@ -182,8 +183,6 @@ fun ViewProfile(
 
                         )
                     }
-
-
 
                     Text(
                        text = userName,
