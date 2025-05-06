@@ -1,0 +1,155 @@
+[
+  {
+    "id": "R001",
+    "ad": "İlk Adım",
+    "description": "İlk gruba katılma veya oluşturma.",
+    "iconId": "rozet1",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GROUP_COMPLETION"
+  },
+  {
+    "id": "R002",
+    "ad": "Günlük Kahraman",
+    "description": "5 günlük grup tamamlama.",
+    "iconId": "rozet2",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GROUP_COMPLETION"
+  },
+  {
+    "id": "R003",
+    "ad": "Haftalık Şampiyon",
+    "description": "3 haftalık grup tamamlama.",
+    "iconId": "rozet3",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GROUP_COMPLETION"
+  },
+  {
+    "id": "R004",
+    "ad": "Aylık Efsane",
+    "description": "1 aylık grup tamamlama.",
+    "iconId": "rozet4",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GROUP_COMPLETION"
+  },
+  {
+    "id": "R005",
+    "ad": "Maratoncu",
+    "description": "Toplam 10 grup tamamlama.",
+    "iconId": "rozet5",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GROUP_COMPLETION"
+  },
+  {
+    "id": "R006",
+    "ad": "Limit Kırıcı",
+    "description": "2'den 3'e geçiş: 1 tane aylık ya da 4 tane haftalık grup tamamla.",
+    "iconId": "rozet6",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "LIMIT_INCREASE"
+  },
+  {
+    "id": "R007",
+    "ad": "Yarı Yol Ustası",
+    "description": "3'ten 4'e geçiş: 2 tane aylık ya da 8 tane haftalık grup tamamla.",
+    "iconId": "rozet7",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "LIMIT_INCREASE"
+  },
+  {
+    "id": "R008",
+    "ad": "Grup Efendisi",
+    "description": "4'ten 5'e geçiş: 4 tane aylık ya da 16 tane haftalık grup tamamla.",
+    "iconId": "rozet8",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "LIMIT_INCREASE"
+  },
+  {
+    "id": "R09",
+    "ad": "Ekip Kurucu",
+    "description": "İlk grubu oluşturma ve başlatma (yönetici olarak).",
+    "iconId": "rozet9",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "ADMIN"
+  },
+  {
+    "id": "R010",
+    "ad": "Disiplin Bekçisi",
+    "description": "Birini gruptan atma (yönetici olarak).",
+    "iconId": "rozet10",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "ADMIN"
+  },
+  {
+    "id": "R011",
+    "ad": "Lider Ruhu",
+    "description": "Bir grubu tamamlama (yönetici olarak).",
+    "iconId": "rozet11",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "ADMIN"
+  },
+  {
+    "id": "R012",
+    "ad": "Çeşitlilik Ustası",
+    "description": "olarak 3 gurup tamamlama(haftalık ve aylık)",
+    "iconId": "rozet12",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GENERAL_ACHIEVEMENT"
+  },
+  {
+    "id": "R013",
+    "ad": "Sadık Üye",
+    "description": "Toplam 50 grup tamamlama.",
+    "iconId": "rozet13",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "GENERAL_ACHIEVEMENT"
+  },
+  {
+    "id": "R014",
+    "ad": "Haftalık Katılımcı",
+    "description": "7 gün boyunca uygulamayı düzenli kullanma.",
+    "iconId": "rozet14",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "APP_USAGE"
+  },
+  {
+    "id": "R015",
+    "ad": "Aylık Sadakat",
+    "description": "30 gün boyunca uygulamayı düzenli kullanma.",
+    "iconId": "rozet15",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "APP_USAGE"
+  },
+  {
+    "id": "R016",
+    "ad": "Alışkanlık Sahibi",
+    "description": "120 gün boyunca uygulamayı düzenli kullanma.",
+    "iconId": "rozet16",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "APP_USAGE"
+  },
+  {
+    "id": "R017",
+    "ad": "Demir Disiplin",
+    "description": "360 gün boyunca uygulamayı düzenli kullanma.",
+    "iconId": "rozet17",
+    "isCompleted": false,
+    "isShown": false,
+    "category": "APP_USAGE"
+  }
+]
