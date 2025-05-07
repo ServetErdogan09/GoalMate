@@ -103,8 +103,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.app.ActivityCompat
+import com.example.goalmate.data.localdata.Badges
 import com.example.goalmate.utils.Constants
 import kotlinx.coroutines.CoroutineScope
+import com.example.goalmate.viewmodel.BadgesViewModel
 
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -117,7 +119,8 @@ fun HomeScreen(
     registerViewModel: RegisterViewModel = viewModel(),
     groupsAddViewModel: GroupsAddViewModel,
     context: Context,
-    motivationQuoteViewModel: MotivationQuoteViewModel = viewModel()
+    motivationQuoteViewModel: MotivationQuoteViewModel = viewModel(),
+    badgesViewModel: BadgesViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val habits = remember(uiState) {
@@ -142,6 +145,8 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         viewModel.getCountActiveHabit()
         groupsAddViewModel.getCurrentTotalPoint()
+        registerViewModel.getCurrentUser(context)
+        badgesViewModel.incrementAppUsageDays()
     }
 
     LaunchedEffect(totalHabits) {
@@ -337,6 +342,24 @@ fun HomeScreen(
                 ) {
                     Text("Reddet", color = colorResource(R.color.pastelkirmizi))
                 }
+            }
+        )
+    }
+
+    // Kazanılan rozetleri göster
+    val newlyEarnedBadges by badgesViewModel.newlyEarnedBadges.collectAsState()
+    var showEarnedBadgesDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(newlyEarnedBadges) {
+        showEarnedBadgesDialog = newlyEarnedBadges.isNotEmpty()
+    }
+
+    if (showEarnedBadgesDialog) {
+        EarnedBadgesDialog(
+            badges = newlyEarnedBadges,
+            onDismiss = {
+                showEarnedBadgesDialog = false
+                badgesViewModel.markBadgesAsShown()
             }
         )
     }
@@ -1544,6 +1567,120 @@ fun RankBadge(rank: String , modifier: Modifier) {
                     )
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun EarnedBadgesDialog(
+    badges: List<Badges>,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            modifier = Modifier
+                .padding(16.dp)
+                .shadow(8.dp, shape = RoundedCornerShape(20.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = "Başarı İkonu",
+                    tint = colorResource(R.color.yildiz),
+                    modifier = Modifier.size(48.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Yeni Rozet Kazandın!",
+                    style = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                    color = colorResource(R.color.yazirengi)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Sadece ilk rozeti göster
+                if (badges.isNotEmpty()) {
+                    EarnedBadgeItem(badge = badges[0])
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = colorResource(R.color.kutubordrengi)),
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text("Harika!", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EarnedBadgeItem(badge: Badges) {
+    val imageRes = when (badge.iconId) {
+        "rozet1" -> R.drawable.rozet1
+        "rozet2" -> R.drawable.rozet2
+        "rozet3" -> R.drawable.rozet3
+        "rozet4" -> R.drawable.rozet4
+        "rozet5" -> R.drawable.rozet5
+        "rozet6" -> R.drawable.rozet6
+        "rozet7" -> R.drawable.rozet7
+        "rozet8" -> R.drawable.rozet8
+        "rozet9" -> R.drawable.rozet9
+        "rozet10" -> R.drawable.rozet10
+        "rozet11" -> R.drawable.rozet11
+        "rozet12" -> R.drawable.rozet12
+        "rozet13" -> R.drawable.rozet13
+        "rozet14" -> R.drawable.rozet14
+        "rozet15" -> R.drawable.rozet15
+        "rozet16" -> R.drawable.rozet16
+        "rozet17" -> R.drawable.rozet17
+        else -> R.drawable.rozet1
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(
+            painter = painterResource(imageRes),
+            contentDescription = badge.description,
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column {
+            Text(
+                text = badge.ad,
+                style = TextStyle(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                color = colorResource(R.color.yazirengi)
+            )
+            
+            Text(
+                text = badge.description,
+                style = TextStyle(
+                    fontSize = 14.sp
+                ),
+                color = colorResource(R.color.yazirengi).copy(alpha = 0.7f)
+            )
         }
     }
 }

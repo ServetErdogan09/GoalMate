@@ -33,6 +33,7 @@ import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.example.goalmate.viewmodel.BadgesViewModel
 import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,6 +46,7 @@ fun GroupMembers(
 ) {
     val members = groupsAddViewModel.groupMembers.collectAsState()
     val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(groupId) {
         groupsAddViewModel.getGroupMembers(groupId)
@@ -87,6 +89,20 @@ fun GroupMembers(
                     color = colorResource(id = R.color.kutubordrengi).copy(alpha = 0.2f)
                 )
             }
+        },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(16.dp)
+            ) { data ->
+                Snackbar(
+                    containerColor = colorResource(id = R.color.kutubordrengi),
+                    contentColor = colorResource(id = R.color.beyaz),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(text = data.visuals.message)
+                }
+            }
         }
     ) { paddingValues ->
         Box(
@@ -107,56 +123,59 @@ fun GroupMembers(
                     defaultElevation = 0.dp
                 )
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                ) {
-                    Row(
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxSize()
+                            .padding(horizontal = 20.dp, vertical = 16.dp)
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_personal_info),
-                            contentDescription = null,
-                            tint = colorResource(R.color.kutubordrengi),
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Grup Üyeleri (${members.value.size})",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colorResource(R.color.yazirengi)
-                        )
-                    }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_personal_info),
+                                contentDescription = null,
+                                tint = colorResource(R.color.kutubordrengi),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Grup Üyeleri (${members.value.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colorResource(R.color.yazirengi)
+                            )
+                        }
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        itemsIndexed(members.value) { index, memberId ->
-                            Column {
-                                ModernParticipantItem(
-                                    memberId = memberId,
-                                    ranking = index + 1,
-                                    isCurrentUser = memberId == currentUserId,
-                                    groupsAddViewModel = groupsAddViewModel,
-                                    navController = navController,
-                                    groupId = groupId,
-                                    badgesViewModel = badgesViewModel
-                                )
-                                
-                                // Don't add divider after the last item
-                                if (index < members.value.size - 1) {
-                                    HorizontalDivider(
-                                        modifier = Modifier
-                                            .padding(horizontal = 16.dp)
-                                            .padding(top = 8.dp, bottom = 8.dp),
-                                        thickness = 1.dp,
-                                        color = colorResource(id = R.color.kutubordrengi).copy(alpha = 0.1f)
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            itemsIndexed(members.value) { index, memberId ->
+                                Column {
+                                    ModernParticipantItem(
+                                        memberId = memberId,
+                                        ranking = index + 1,
+                                        isCurrentUser = memberId == currentUserId,
+                                        groupsAddViewModel = groupsAddViewModel,
+                                        navController = navController,
+                                        groupId = groupId,
+                                        badgesViewModel = badgesViewModel,
+                                        snackbarHostState = snackbarHostState
                                     )
+                                    
+                                    // Don't add divider after the last item
+                                    if (index < members.value.size - 1) {
+                                        HorizontalDivider(
+                                            modifier = Modifier
+                                                .padding(horizontal = 16.dp)
+                                                .padding(top = 8.dp, bottom = 8.dp),
+                                            thickness = 1.dp,
+                                            color = colorResource(id = R.color.kutubordrengi).copy(alpha = 0.1f)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -175,11 +194,13 @@ fun ModernParticipantItem(
     isCurrentUser: Boolean,
     groupsAddViewModel: GroupsAddViewModel,
     navController: NavController,
-    badgesViewModel: BadgesViewModel
+    badgesViewModel: BadgesViewModel,
+    snackbarHostState: SnackbarHostState
 ) {
     val userNames = groupsAddViewModel.userNames.collectAsState().value
     val profileImages = groupsAddViewModel.profileImages.collectAsState().value
     val groupDetailState = groupsAddViewModel.groupDetailState.collectAsState().value
+    val scope = rememberCoroutineScope()
 
     val userName = userNames[memberId] ?: "Yükleniyor..."
     val profileImage = profileImages[memberId] ?: ""
@@ -192,7 +213,8 @@ fun ModernParticipantItem(
 
     var isPressed by remember { mutableStateOf(false) }
     var showMenu by remember { mutableStateOf(false) }
-    
+    var showConfirmationDialog by remember { mutableStateOf(false) }
+
     val backgroundColor by animateColorAsState(
         targetValue = if (isPressed)
             colorResource(id = R.color.kutubordrengi).copy(alpha = 0.1f)
@@ -214,9 +236,9 @@ fun ModernParticipantItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp, vertical = 4.dp)
-                .clickable { 
+                .clickable {
                     isPressed = true
-                    showMenu = true 
+                    showMenu = true
                 },
             colors = CardDefaults.cardColors(
                 containerColor = backgroundColor
@@ -363,16 +385,16 @@ fun ModernParticipantItem(
 
         DropdownMenu(
             expanded = showMenu,
-            onDismissRequest = { 
+            onDismissRequest = {
                 showMenu = false
-                isPressed = false 
+                isPressed = false
             },
             modifier = Modifier
                 .background(colorResource(id = R.color.kutubordrengi))
                 .width(150.dp)
         ) {
             DropdownMenuItem(
-                text = { 
+                text = {
                     Text(
                         "Profili Görüntüle",
                         color = Color.White
@@ -387,7 +409,7 @@ fun ModernParticipantItem(
             if (!isCurrentUser && !isGroupLeader) {
                 HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
                 DropdownMenuItem(
-                    text = { 
+                    text = {
                         Text(
                             "Gruptan Çıkar",
                             color = Color.White
@@ -395,12 +417,86 @@ fun ModernParticipantItem(
                     },
                     onClick = {
                         showMenu = false
-                        groupsAddViewModel.leaveGroup(groupId = groupId)
-                        badgesViewModel.fetchKickedMemberCount()
-
+                        showConfirmationDialog = true
                     }
                 )
             }
+        }
+
+        if (showConfirmationDialog) {
+            AlertDialog(
+                onDismissRequest = { showConfirmationDialog = false },
+                title = {
+                    Text(
+                        text = "Kullanıcıyı Çıkar",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = colorResource(id = R.color.yazirengi)
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Bu kullanıcıyı gruptan çıkarmak istediğinizden emin misiniz? Bu işlem geri alınamaz ve kullanıcı tekrar gruba katılamaz.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(id = R.color.yazirengi)
+                    )
+                },
+                confirmButton = {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            onClick = { showConfirmationDialog = false },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(45.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colorResource(R.color.kutubordrengi).copy(alpha = 0.1f))
+                        ) {
+                            Text(
+                                "İptal",
+                                color = colorResource(id = R.color.kutubordrengi),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+
+                        TextButton(
+                            onClick = {
+                                showConfirmationDialog = false
+                                groupsAddViewModel.leaveGroup(groupId = groupId, userId = memberId)
+                                badgesViewModel.fetchKickedMemberCount()
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        message = "$userName gruptan çıkarıldı",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    groupsAddViewModel.getGroupMembers(groupId)
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(45.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colorResource(R.color.kutubordrengi))
+                        ) {
+                            Text(
+                                "Evet, Çıkar",
+                                color = colorResource(id = R.color.beyaz),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    }
+                },
+                dismissButton = null,
+                containerColor = colorResource(id = R.color.beyaz),
+                shape = RoundedCornerShape(16.dp),
+                properties = DialogProperties(
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true
+                )
+            )
         }
     }
 }

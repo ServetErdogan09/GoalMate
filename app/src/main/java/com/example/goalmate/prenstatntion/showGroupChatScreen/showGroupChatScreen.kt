@@ -109,6 +109,7 @@ import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.LottieConstants
+import com.example.goalmate.viewmodel.RegisterViewModel
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -138,7 +139,8 @@ fun ShowGroupChatScreen(
     daysLeft : Long,
     habitType : String,
     navController: NavController,
-    groupsAddViewModel: GroupsAddViewModel
+    groupsAddViewModel: GroupsAddViewModel,
+    registerViewModel: RegisterViewModel
 ){
     val context = LocalContext.current
     
@@ -147,7 +149,7 @@ fun ShowGroupChatScreen(
     var pointsChange by remember { mutableStateOf(0) }
     
     // Mevcut puanı takip et
-    val currentPoints by groupsAddViewModel.totalPoint.collectAsState()
+    val currentPoints by registerViewModel.userPoints.collectAsState()
     var lastPoints by remember { mutableStateOf(currentPoints) }
     
     // Puan değişikliğini kontrol et
@@ -377,6 +379,10 @@ fun ShowGroupChatScreen(
                         Column(
                             modifier = Modifier
                                 .padding(start = 8.dp)
+                                .clickable{
+                                    // kullanıcıalr çekilecek
+                                    navController.navigate("GroupMembers/$groupedId/$groupName")
+                                }
                                 .weight(1f)
                         ) {
                             // Grup adı
@@ -938,7 +944,7 @@ fun leaveGroup(daysLeft: Long, frequency: String, groupsAddViewModel: GroupsAddV
     if (daysLeft < minDaysRequired) {
         onShowSnackbar("Alışkanlık süresinin sonuna kadar gruptan ayrılamazsınız.")
     } else {
-        groupsAddViewModel.leaveGroup(groupedId)
+        groupsAddViewModel.leaveGroup(groupedId, userId = "0")
         if (members <= 1) { // Eğer son üye de ayrılıyorsa
             groupsAddViewModel.closeGroup(groupedId)
             onShowSnackbar("Son üye ayrıldığı için grup kapatıldı.")
@@ -973,7 +979,8 @@ fun VotingBanner(
 
 
     LaunchedEffect(voteState.votingEndTime) {
-        val currentServerTime = NetworkUtils.getTime(context = context)
+        //val currentServerTime = NetworkUtils.getTime(context = context)
+        val currentServerTime = System.currentTimeMillis() // test amaçlı
         while (remainingTime > 0) {
             delay(1000)
             remainingTime = voteState.votingEndTime - currentServerTime

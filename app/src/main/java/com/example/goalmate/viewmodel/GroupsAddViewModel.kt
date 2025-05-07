@@ -67,7 +67,10 @@ class GroupsAddViewModel @Inject constructor(
     private val _groupListState = MutableStateFlow<GroupListState>(GroupListState.Loading)
     val groupListState = _groupListState.asStateFlow()
 
+    // Gurup üyeleri
 
+    private val _groupMembers = MutableStateFlow<List<String>>(emptyList())
+    val groupMembers : StateFlow<List<String>> = _groupMembers.asStateFlow()
 
     val totalPoint : StateFlow<Int> = pointsRepository.userPoints
 
@@ -265,6 +268,25 @@ class GroupsAddViewModel @Inject constructor(
 
 
 
+
+    fun getGroupMembers(groupId: String){
+        viewModelScope.launch {
+            try {
+               val groupRef = db.collection("groups")
+                   .document(groupId)
+                   .get()
+                   .await()
+
+                val groupMembers = groupRef.get("members") as? List<String> ?: emptyList()
+                _groupMembers.value = groupMembers
+                groupMembers.forEach { user->
+                    Log.e("Members","$user ıd")
+                }
+            }catch (e: Exception){
+                Log.e("Members","gurup üyelerini çekerken hata oluştu")
+            }
+        }
+    }
 
 
  // kullanıcı tamamladığını firestore kaydediyoruz duurmu
@@ -594,11 +616,11 @@ class GroupsAddViewModel @Inject constructor(
 
 
 
-    fun leaveGroup(groupId: String) {
+    fun leaveGroup(groupId: String ,userId: String) {
         viewModelScope.launch {
             try {
-                val currentUser = auth.currentUser ?: return@launch
-                val userRef = db.collection("users").document(currentUser.uid)
+                val id = if (userId == "0")   auth.currentUser?.uid ?: return@launch else userId
+                val userRef = db.collection("users").document(id)
                 val groupRef = db.collection("groups").document(groupId)
 
                 db.runTransaction { transaction ->
@@ -614,17 +636,20 @@ class GroupsAddViewModel @Inject constructor(
 
                     if (group != null) {
                         // Gruptan kullanıcıyı çıkar
-                        val updatedMembers = group.members.filter { it != currentUser.uid }
+                        val updatedMembers = group.members.filter { it != id }
                         transaction.update(groupRef, "members", updatedMembers)
 
                         // Kullanıcının joinedGroups listesinden grubu çıkar
                         val updatedJoinedGroups = joinedGroups.filter { it != groupId }
                         transaction.update(userRef, "joinedGroups", updatedJoinedGroups)
 
+                        // UI'ı hemen güncellemek için grup üyelerini güncelle
+                        _groupMembers.value = updatedMembers
+
                         Log.d("leaveGroup", "Grup güncelleniyor: $groupId")
                         Log.d("leaveGroup", "Eski üye listesi: ${group.members}")
                         Log.d("leaveGroup", "Yeni üye listesi: $updatedMembers")
-                        Log.d("leaveGroup", "Kullanıcı güncelleniyor: ${currentUser.uid}")
+                        Log.d("leaveGroup", "Kullanıcı güncelleniyor: ${id}")
                         Log.d("leaveGroup", "Eski katıldığı gruplar: $joinedGroups")
                         Log.d("leaveGroup", "Yeni katıldığı gruplar: $updatedJoinedGroups")
 
@@ -636,13 +661,15 @@ class GroupsAddViewModel @Inject constructor(
                         }
                     }
                 }.addOnSuccessListener {
-                    Log.d("leaveGroup", "Kullanıcı başarıyla gruptan ayrıldı: ${currentUser.uid}")
+                    Log.d("leaveGroup", "Kullanıcı başarıyla gruptan ayrıldı: ${id}")
                     viewModelScope.launch {
                         // Grup listelerini güncelle
                         getUserGroups()
                         resetGroupList()
                         // Grup detaylarını güncelle
                         getGroupById(groupId)
+                        // Grup üyelerini güncelle
+                        getGroupMembers(groupId)
                     }
                 }.addOnFailureListener { e ->
                     Log.e("leaveGroup", "Gruptan ayrılma hatası", e)
