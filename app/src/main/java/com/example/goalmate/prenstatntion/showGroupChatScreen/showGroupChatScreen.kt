@@ -100,6 +100,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.goalmate.utils.NetworkUtils
@@ -264,6 +265,34 @@ fun ShowGroupChatScreen(
     val messagesState by groupsAddViewModel.chatMessage.collectAsState()
 
     Log.e("groupeId","groupeId = $groupedId")
+
+    var showLeaveDialog by remember { mutableStateOf(false) }
+
+    Log.e("habitType","$habitType habitType ")
+
+    // Dialog'u en üst seviyede göster
+    if (showLeaveDialog) {
+        LeaveGroupDialog(
+            frequency = habitType,
+            daysLeft = daysLeft,
+            onConfirm = {
+                showLeaveDialog = false
+                handleLeaveGroup(
+                    daysLeft = daysLeft,
+                    frequency = habitType,
+                    groupsAddViewModel = groupsAddViewModel,
+                    groupedId = groupedId,
+                    members = members,
+                    navController = navController,
+                    onShowSnackbar = showSnackbar,
+                    registerViewModel = registerViewModel
+                )
+            },
+            onDismiss = {
+                showLeaveDialog = false
+            }
+        )
+    }
 
     // Habit tamamlandığında  dialog
     if (showHabitDialog) {
@@ -502,15 +531,7 @@ fun ShowGroupChatScreen(
                                     text = { Text(text = "Guruptan Ayrıl") },
                                     onClick = {
                                         expanded = false
-                                        leaveGroup(
-                                            daysLeft = daysLeft,
-                                            frequency = habitType,
-                                            groupsAddViewModel = groupsAddViewModel,
-                                            groupedId = groupedId,
-                                            members = members,
-                                            navController = navController,
-                                            onShowSnackbar = showSnackbar
-                                        )
+                                        showLeaveDialog = true
                                     }
                                 )
 
@@ -741,7 +762,7 @@ fun ShowGroupChatScreen(
                         text = "Mesajlar gönderildikten 24 saat sonra otomatik olarak silinir",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontSize = 10.sp,
-                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            fontStyle = FontStyle.Italic
                         ),
                         color = colorResource(id = R.color.yazirengi).copy(alpha = 0.5f),
                         textAlign = TextAlign.Center,
@@ -933,7 +954,115 @@ fun MessageItem(
     }
 }
 
-fun leaveGroup(daysLeft: Long, frequency: String, groupsAddViewModel: GroupsAddViewModel, groupedId: String, members: Int, navController: NavController, onShowSnackbar: (String) -> Unit) {
+@Composable
+fun LeaveGroupDialog(
+    frequency: String,
+    daysLeft: Long,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val penaltyPoints = when(frequency.lowercase()) {  // kalan gün sayıısna göre kesilecek puanı veriyor
+        "günlük" -> if (daysLeft.toInt() == 1) 0 else  if (daysLeft < 1) 10 else 0
+        "haftalık" -> if (daysLeft.toInt() == 7) 0 else if (daysLeft < 7) 20 else 0
+        "aylık" -> if (daysLeft.toInt() == 30) 0 else  if (daysLeft < 30) 30 else 0
+        else -> 0
+    }
+
+    Log.e("penaltyPoints","$penaltyPoints penaltyPoints")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Gruptan Ayrılma Onayı",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (daysLeft > 1) {
+                    Text(
+                        text = if (penaltyPoints == 0) "24 saat geçmediği için gruptan ceza almadan ayrılabilirsiniz." else "Gruba katılımınızın üzerinden 24 saat geçtiği için ayrılmanız durumunda $penaltyPoints puan kaybedeceksiniz.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (penaltyPoints == 0) colorResource(id = R.color.yesil2) else colorResource(id = R.color.pastelkirmizi),
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Text(
+                        text = "24 saat geçmediği için gruptan ceza almadan ayrılabilirsiniz.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colorResource(id = R.color.yesil2),
+                        textAlign = TextAlign.Center
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Gruptan ayrılmak istediğinize emin misiniz?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colorResource(R.color.kutubordrengi).copy(alpha = 0.1f))
+                ) {
+                    Text(
+                        text = "İptal",
+                        color = colorResource(id = R.color.kutubordrengi),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+
+                TextButton(
+                    onClick = onConfirm,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(colorResource(R.color.kutubordrengi))
+                ) {
+                    Text(
+                        text = "Ayrıl",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            }
+        },
+        dismissButton = null
+    )
+}
+
+fun handleLeaveGroup(
+    daysLeft: Long,
+    frequency: String,
+    groupsAddViewModel: GroupsAddViewModel,
+    groupedId: String,
+    members: Int,
+    navController: NavController,
+    onShowSnackbar: (String) -> Unit,
+    registerViewModel: RegisterViewModel
+) {
     val minDaysRequired = when(frequency.lowercase()) {
         "günlük" -> 1
         "haftalık" -> 7
@@ -941,18 +1070,46 @@ fun leaveGroup(daysLeft: Long, frequency: String, groupsAddViewModel: GroupsAddV
         else -> 0
     }
 
-    if (daysLeft < minDaysRequired) {
-        onShowSnackbar("Alışkanlık süresinin sonuna kadar gruptan ayrılamazsınız.")
-    } else {
-        groupsAddViewModel.leaveGroup(groupedId, userId = "0")
-        if (members <= 1) { // Eğer son üye de ayrılıyorsa
+    val isSameDay = daysLeft.toInt() == minDaysRequired
+    val isLastMember = members <= 1
+
+    if (isSameDay) {
+        // Aynı gün ayrılıyor → ceza yok
+        groupsAddViewModel.leaveGroup(groupId = groupedId, userId = "0")
+
+        if (isLastMember) {
             groupsAddViewModel.closeGroup(groupedId)
             onShowSnackbar("Son üye ayrıldığı için grup kapatıldı.")
         } else {
             onShowSnackbar("Gruptan başarıyla ayrıldınız.")
         }
+
+        // Hemen navigasyon yap
         navController.navigate("GroupListScreen") {
             popUpTo(0) { inclusive = true }
+        }
+
+    } else {
+        // Farklı bir gün ayrılıyor → ceza uygulanacak
+        registerViewModel.calculateExitPenalty(frequency)
+
+        groupsAddViewModel.leaveGroup(groupId = groupedId, userId = "0")
+
+        if (isLastMember) {
+            groupsAddViewModel.closeGroup(groupedId)
+            onShowSnackbar("Ceza uygulandı. Son üye ayrıldığı için grup kapatıldı.")
+        } else {
+            onShowSnackbar("Ceza uygulandı. Gruptan ayrıldınız.")
+        }
+
+        // Puan animasyonunun tamamlanmasını bekle
+        kotlinx.coroutines.MainScope().launch {
+            // 2 saniye bekle (animasyon süresi)
+            kotlinx.coroutines.delay(2000)
+            // Sonra navigasyon yap
+            navController.navigate("GroupListScreen") {
+                popUpTo(0) { inclusive = true }
+            }
         }
     }
 }

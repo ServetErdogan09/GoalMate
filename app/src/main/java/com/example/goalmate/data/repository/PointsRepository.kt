@@ -71,6 +71,50 @@ class PointsRepository @Inject constructor(
         }
     }
 
+
+    suspend fun calculateExitPenalty(frequency: String) {
+        val currentId = auth.currentUser?.uid ?: run {
+            Log.e("PointsRepository", "Kullanıcı ID'si bulunamadı")
+            return
+        }
+
+        val pointsBroken = when (frequency.lowercase()) {
+            "günlük" -> -10
+            "haftalık" -> -20
+            "aylık" -> -30
+            else -> 0
+        }
+
+        Log.d("PointsRepository", "Puan kırılma değeri hesaplandı: $pointsBroken")
+
+        try {
+            val userRef = db.collection("users").document(currentId)
+                .get()
+                .await()
+
+            Log.d("PointsRepository", "Kullanıcı dökümanı başarıyla alındı")
+
+            val currentPoint = userRef.getLong("totalPoints")?.toInt() ?: 0
+            Log.d("PointsRepository", "Mevcut puan: $currentPoint")
+
+            // Yeni toplam puanı hesapla
+            val newTotalPoints = currentPoint + pointsBroken
+            Log.d("PointsRepository", "Yeni toplam puan hesaplandı: $newTotalPoints")
+
+            userRef.reference.update("totalPoints", newTotalPoints).await()
+            Log.d("PointsRepository", "Firebase'de puan başarıyla güncellendi")
+
+            // Güncel puanı state'e at
+            _userPoints.value = newTotalPoints
+            Log.d("PointsRepository", "Yeni puan local state'e başarıyla güncellendi: $newTotalPoints")
+
+        } catch (e: Exception) {
+            Log.e("PointsRepository", "Puan hesaplanırken hata oluştu", e)
+        }
+    }
+
+
+
     // Puan hesaplama ve güncelleme
     suspend fun calculateAndUpdatePoints(
         frequency: String,
@@ -87,9 +131,9 @@ class PointsRepository @Inject constructor(
 
             // Frekansa göre puan hesapla
             val pointChange = when (frequency.lowercase()) {
-                "günlük" -> if (isCompleted) 5 else if (isReversingPenalty) 0 else 0
-                "haftalık" -> if (isCompleted) 10 else if (isReversingPenalty) 14 else -4
-                "aylık" -> if (isCompleted) 12 else if (isReversingPenalty) 18 else -6
+                "günlük" -> if (isCompleted) 5 else if (isReversingPenalty) 6 else -1
+                "haftalık" -> if (isCompleted) 7 else if (isReversingPenalty) 9 else -2
+                "aylık" -> if (isCompleted) 9 else if (isReversingPenalty) 11 else -2
                 else -> 0
             }
 
@@ -123,6 +167,9 @@ class PointsRepository @Inject constructor(
             return 0
         }
     }
+
+
+
 
     // Firebase'den gelen puan değişikliklerini dinle
      fun listenToPointChanges(userId: String, context: Context) {
