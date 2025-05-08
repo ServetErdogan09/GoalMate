@@ -467,15 +467,12 @@ fun HomeScreen(
                                     modifier = Modifier.padding(top = 4.dp)
                                 ) {
                                     RankBadge(rank = Constants.getRankFromPoints(totalPoint) , modifier = Modifier)
-                                    /*
-                                    Text(
-                                        text = "Hoş Geldin",
-                                        color = colorResource(R.color.yazirengi),
-                                        fontSize = 14.sp,
-                                        modifier = Modifier.padding(start = 8.dp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Image(
+                                        painter = painterResource(Constants.getRankIcon(rank = Constants.getRankFromPoints(totalPoint))),
+                                        contentDescription = "Rank Icon",
+                                        modifier = Modifier.size(24.dp)
                                     )
-
-                                     */
                                 }
                             }
                         }
@@ -947,6 +944,16 @@ fun HabitCard(
             },
             onDelete = {
                 viewModel.deleteHabit(habit)
+
+               val newHabitHistory = HabitHistory(
+                   id = habit.id.toLong(),
+                   habitName = habit.name,
+                   startDate = habit.startDate,
+                   frequency = habit.frequency,
+                   daysCompleted = habit.completedDays,
+                   habitType = habit.habitType
+               )
+                viewModel.insertHabitHistory(newHabitHistory)
                 isDialogOpen = false
             }
         )
@@ -1544,13 +1551,7 @@ fun RankBadge(rank: String , modifier: Modifier) {
                 horizontalArrangement = Arrangement.Start,
                 modifier = Modifier.height(20.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = null,
-                    tint = colors[1],
-                    modifier = Modifier.size(12.dp)
-                )
-                
+
                 Spacer(modifier = Modifier.width(4.dp))
                 
                 Text(
@@ -1567,6 +1568,7 @@ fun RankBadge(rank: String , modifier: Modifier) {
                     )
                 )
             }
+
         }
     }
 }

@@ -190,6 +190,16 @@ data class MotivationQuote(
     val quote: String = ""
 )
 
+
+
+// kullancıı rütbe artırması için gerekli puan
+data class NextRankInfo(
+    val nextRank: String,
+    val nextRankMinPoints: Int,
+    val pointsNeeded: Int
+)
+
+
 data class GroupRequest(
     val id: String,
     val groupId: String,
