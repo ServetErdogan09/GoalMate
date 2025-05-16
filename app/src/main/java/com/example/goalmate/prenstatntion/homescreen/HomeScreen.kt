@@ -477,7 +477,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.End,
                             modifier = Modifier
                                 .padding(start = 8.dp)
-                                .width(130.dp)
+                                .width(180.dp)
                         ) {
 
                             Box(
@@ -508,15 +508,15 @@ fun HomeScreen(
 
 
 
-                            Spacer(modifier = Modifier.width(30.dp))
+                            Spacer(modifier = Modifier.width(20.dp))
 
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Image(
-                                    painter = painterResource(id = R.drawable.sackdollar),
+                                    painter = painterResource(id = R.drawable.puan),
                                     contentDescription = "Coin",
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(35.dp)
                                 )
 
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -525,7 +525,7 @@ fun HomeScreen(
                                     text = "$totalPoint",
                                     color = colorResource(R.color.yazirengi),
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    fontSize = 18.sp
                                 )
                             }
                         }
