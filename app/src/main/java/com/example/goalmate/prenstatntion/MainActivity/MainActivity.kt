@@ -52,6 +52,7 @@ import com.example.goalmate.R
 import com.example.goalmate.ui.theme.YeniProjeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
+import com.example.goalmate.prenstatntion.BadgesScreen.BadgesScreen
 import com.example.goalmate.prenstatntion.GroupsListScreen.GroupDetailScreen
 import com.example.goalmate.prenstatntion.ProfilScreen.ProfileScreen
 import com.example.goalmate.prenstatntion.UserScreen.UserScreen
@@ -66,12 +67,12 @@ import com.example.goalmate.viewmodel.GroupsAddViewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.goalmate.prenstatntion.BaseScreen.BaseScreen
+import com.example.goalmate.prenstatntion.GroupMembers.GroupMembers
 import com.example.goalmate.prenstatntion.RulesScreen.RulesScreen
 import com.example.goalmate.prenstatntion.ScoreBoard.ScoreBoardScreen
 import com.example.goalmate.prenstatntion.StatsScreen
 import com.example.goalmate.prenstatntion.showGroupChatScreen.ShowGroupChatScreen
 import com.example.goalmate.prenstatntion.viewProfile.ViewProfile
-import com.example.goalmate.presentation.badgesScreen.BadgesScreen
 import com.example.goalmate.viewmodel.BadgesViewModel
 import com.example.goalmate.viewmodel.HabitStatsViewModel
 import com.example.goalmate.viewmodel.MotivationQuoteViewModel
@@ -192,6 +193,7 @@ fun ChangingScreen() {
                 currentRoute != "StatsScreen" &&
                 currentRoute != "BadgesScreen" &&
                 !currentRoute.startsWith("showGroupChatScreen") &&
+                !currentRoute.startsWith("GroupMembers") &&
                 !currentRoute.startsWith("ScoreBoardScreen") &&
                 !currentRoute.startsWith("ViewProfile")
             ) {
@@ -217,7 +219,7 @@ fun ChangingScreen() {
                 ProfileScreen(navController = navController)
             }
             composable(route = "BadgesScreen") {
-                BadgesScreen(navController = navController, badgesViewModel = badgesViewModel,context)
+                BadgesScreen(navController = navController, badgesViewModel = badgesViewModel, context = context)
             }
 
 
@@ -235,9 +237,26 @@ fun ChangingScreen() {
             }
 
             composable(route = "HomeScreen") {
-                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context, motivationQuoteViewModel = motivationQuoteViewModel, groupsAddViewModel = groupsAddViewModel)
+                HomeScreen(navController, habitViewModel, starCoinViewModel, completeDayViewModel , registerViewModel = registerViewModel, context = context, motivationQuoteViewModel = motivationQuoteViewModel, groupsAddViewModel = groupsAddViewModel, badgesViewModel = badgesViewModel)
             }
 
+
+            composable(
+                route = "GroupMembers/{groupId}/{groupName}",
+                arguments = listOf(
+                    navArgument("groupId") {
+                        type = NavType.StringType
+                    },
+                    navArgument("groupId") {
+                        type = NavType.StringType
+                    }
+                )
+            ){backStackEntry->
+
+                val groupId = backStackEntry.arguments?.getString("groupId")?:""
+                val groupName = backStackEntry.arguments?.getString("groupName")?:""
+                GroupMembers(groupId = groupId  , navController = navController , groupsAddViewModel = groupsAddViewModel, groupName = groupName, badgesViewModel = badgesViewModel)
+            }
 
 
             composable(route = "UserScreen") {
@@ -315,7 +334,7 @@ fun ChangingScreen() {
                 val habitType = backStackEntry.arguments?.getString("habitType") ?:"Günlük"
                 val groupMembers = backStackEntry.arguments?.getInt("members") ?: 0
                 val groupDaysLeft = backStackEntry.arguments?.getLong("daysLeft") ?: 0  // getInt yerine getLong ve doğru parametre
-                ShowGroupChatScreen(navController = navController, groupedId = groupedId, groupsAddViewModel = groupsAddViewModel, groupName = groupName, members = groupMembers, daysLeft = groupDaysLeft , habitType = habitType)
+                ShowGroupChatScreen(navController = navController, groupedId = groupedId, groupsAddViewModel = groupsAddViewModel, groupName = groupName, members = groupMembers, daysLeft = groupDaysLeft , habitType = habitType, registerViewModel = registerViewModel)
             }
 
             composable(

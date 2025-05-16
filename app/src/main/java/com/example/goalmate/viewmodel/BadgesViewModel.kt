@@ -1,10 +1,13 @@
 package com.example.goalmate.viewmodel
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.goalmate.data.localdata.Badges
 import com.example.goalmate.data.repository.BadgesRepository
+import com.example.goalmate.utils.NetworkUtils
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,12 +75,14 @@ class BadgesViewModel @Inject constructor(
         }
     }
 
-    fun incrementAppUsageDays() {
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun incrementAppUsageDays(context: android.content.Context) {
         viewModelScope.launch {
             try {
                 val lastUsageDate = badgesRepository.getLastUsageDate()
-                val currentDate = System.currentTimeMillis()
-                
+                //val currentDate = System.currentTimeMillis()
+                val currentDate = NetworkUtils.getTime(context)
+
                 // Yeni gün kontrolü (24 saat geçmiş mi?)
                 if (lastUsageDate == 0L || (currentDate - lastUsageDate) >= 24 * 60 * 60 * 1000) {
                     val currentUsageDays = badgesRepository.getAppUsageDays()
@@ -96,6 +101,34 @@ class BadgesViewModel @Inject constructor(
             }
         }
     }
+
+
+
+    fun fetchKickedMemberCount() {
+        viewModelScope.launch {
+            try {
+
+                val currentKickCount = badgesRepository.getKickedMemberCount()
+                Log.d("FetchKickedMemberCount", "Mevcut atılan kullanıcı sayısı: $currentKickCount")
+
+                val newKickCount = currentKickCount + 1
+                Log.d("FetchKickedMemberCount", "Yeni atılan kullanıcı sayısı hesaplandı: $newKickCount")
+
+                // Veritabanını güncelle
+                badgesRepository.updateRemovedUserCount(newKickCount)
+                Log.d("FetchKickedMemberCount", "Yeni atılan kullanıcı sayısı veritabanına kaydedildi: $newKickCount")
+
+                // Admin rozet kontrolü
+                badgesRepository.checkAdminBadges(isAdmin = true, kickedMemberCount = newKickCount, adminCompletedGroups = 0)
+                Log.d("FetchKickedMemberCount", "Admin rozet kontrolü başarıyla yapıldı.")
+            } catch (e: Exception) {
+                // Hata logu
+                Log.e("FetchKickedMemberCount", "Kullanıcı sayısı güncellenirken hata oluştu: ${e.message}")
+            }
+        }
+    }
+
+
 
     fun markBadgesAsShown() {
         viewModelScope.launch {

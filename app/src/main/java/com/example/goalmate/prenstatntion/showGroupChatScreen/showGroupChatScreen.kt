@@ -1136,8 +1136,8 @@ fun VotingBanner(
 
 
     LaunchedEffect(voteState.votingEndTime) {
-        //val currentServerTime = NetworkUtils.getTime(context = context)
-        val currentServerTime = System.currentTimeMillis() // test amaçlı
+        val currentServerTime = NetworkUtils.getTime(context = context)
+       // val currentServerTime = System.currentTimeMillis() // test amaçlı
         while (remainingTime > 0) {
             delay(1000)
             remainingTime = voteState.votingEndTime - currentServerTime

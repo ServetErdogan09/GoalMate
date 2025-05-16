@@ -169,32 +169,40 @@ fun ViewProfile(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = { navController.popBackStack() },
-                        modifier = Modifier.padding(start = 4.dp , top = 30.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            painter = painterResource(R.drawable.back),
-                            contentDescription = "Geri",
-                            tint = colorResource(id = R.color.yazirengi),
+                        IconButton(
+                            onClick = { navController.popBackStack() },
+                            modifier = Modifier.padding(start = 4.dp, top = 30.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.back),
+                                contentDescription = "Geri",
+                                tint = colorResource(id = R.color.yazirengi),
+                            )
+                        }
 
+                        Text(
+                            text = userName,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily(Font(R.font.noto_regular)),
+                            color = colorResource(id = R.color.yazirengi),
+                            modifier = Modifier.padding(start = 10.dp, top = 30.dp)
                         )
                     }
 
-                    Text(
-                       text = userName,
-                        fontSize = 22.sp, // Kullanıcının ismi boyutu
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily(Font(R.font.noto_regular)),
-                        color = colorResource(id = R.color.yazirengi),
-                        modifier = Modifier.padding(start = 10.dp, top = 30.dp)
+                    Image(
+                        painter = painterResource(Constants.getRankIcon(rank = Constants.getRankFromPoints(userPoint))),
+                        contentDescription = "Rank Icon",
+                        modifier = Modifier
+                            .padding(end = 16.dp, top = 30.dp)
+                            .size(45.dp)
                     )
-                    RankBadge(rank = Constants.getRankFromPoints(userPoint) , modifier = Modifier.padding(start = 10.dp , top = 30.dp))
-
-
                 }
             }
         }
@@ -222,20 +230,16 @@ fun ViewProfile(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     item {
-                        // Modern Profile Header
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                         ) {
-                            // Profile Info Row
-
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 15.dp, bottom = 16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Profile Image with animated border
                                 Box(
                                     modifier = Modifier
                                         .size(85.dp)
@@ -264,10 +268,16 @@ fun ViewProfile(
 
                                 Spacer(modifier = Modifier.width(16.dp))
 
-                                // User Info and Stats
                                 Column(
                                     modifier = Modifier.weight(1f)
                                 ) {
+                                    // Rank Badge ve Icon'u buraya taşıyoruz
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    ) {
+                                        RankBadge(rank = Constants.getRankFromPoints(userPoint), modifier = Modifier)
+                                    }
 
                                     Row(
                                         modifier = Modifier

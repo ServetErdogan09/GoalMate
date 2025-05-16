@@ -46,7 +46,7 @@ class ExpireGroupWorker @AssistedInject constructor(
 
             Log.d("ExpireGroupWorker", "Aktif grup sayısı: ${activeGroups.size}")
 
-            //val currentTime = NetworkUtils.getTime(applicationContext) // test amaçlı yerel saat kullanılıyor testen sonra değiştirilecek
+           // val currentTime = NetworkUtils.getTime(applicationContext) // test amaçlı yerel saat kullanılıyor testen sonra değiştirilecek
             val currentTime = System.currentTimeMillis() // test amaçlı yerel saat kullanılıyor testen sonra değiştirilecek
             val calendar = Calendar.getInstance().apply {
                 timeInMillis = currentTime
@@ -252,7 +252,7 @@ class ExpireGroupWorker @AssistedInject constructor(
 
 
 
-    suspend fun completedGroup(groupId: String){
+    private suspend fun completedGroup(groupId: String){
         try {
             // Grup dokümanını Firestore'dan çek
             val groupDoc = db.collection("groups").document(groupId).get().await()
@@ -319,12 +319,13 @@ class ExpireGroupWorker @AssistedInject constructor(
                         monthlyGroupCount = monthlyGroupCount
                     )
 
-                    if (currentId == createdBy)
-                    badgesRepository.checkAdminBadges(
-                        isAdmin = true,
-                        adminCompletedGroups = adminCompletedGroups,
-                        kickedMemberCount = 0
-                    )
+                    if (currentId == createdBy) {
+                        badgesRepository.checkAdminBadges(
+                            isAdmin = true,
+                            adminCompletedGroups = adminCompletedGroups,
+                            kickedMemberCount = 0
+                        )
+                    }
 
                 } else {
                     // Eğer istatistik dokümanı yoksa, yeni bir doküman oluştur

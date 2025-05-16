@@ -151,12 +151,15 @@ fun LoginScreen(
             }
             
             is AuthState.Error -> {
+                /*
                 Text(
                     text = (state as AuthState.Error).message,
                     color = Color.Red,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     textAlign = TextAlign.Center
                 )
+
+                 */
             }
             
             else -> {}
@@ -720,18 +723,6 @@ fun BirthDateStep(
             }
         }
 
-        // Hata mesajı gösterimi
-        when (authState) {
-            is AuthState.Error -> {
-                Text(
-                    text = (authState as AuthState.Error).message,
-                    color = Color.Red,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    textAlign = TextAlign.Center
-                )
-            }
-            else -> {}
-        }
 
         Button(
             onClick = {

@@ -26,15 +26,15 @@ object Constants {
 
     fun getRankIcon(rank: String): Int {
         return when (rank) {
-            "Kararlı" -> R.drawable.acemi
-           // "Başlangıç" -> R.drawable.baslangic_icon
-          //  "Çaylak" -> R.drawable.caylak_icon
-           // "Disiplinli" -> R.drawable.disiplinli_icon
-           // "Kararlı" -> R.drawable.kararli_icon
-            //"Usta" -> R.drawable.usta_icon
-            //"Bilge" -> R.drawable.bilge_icon
-            //"Efsane" -> R.drawable.efsane_icon
-            else -> R.drawable.acemi
+            "Acemi" -> R.drawable.rank_1_acemi_icon
+            "Başlangıç" -> R.drawable.rank_2_baslangic_icon
+            "Çaylak" -> R.drawable.rank_3_caylak_icon
+            "Disiplinli" -> R.drawable.rank_4_disiplinli_icon
+            "Kararlı" -> R.drawable.rank_5_kararli_icon
+            "Usta" -> R.drawable.rank_6_usta_icon
+            "Bilge" -> R.drawable.rank_7_bilge_icon
+            "Efsane" -> R.drawable.efsane_icon
+            else -> R.drawable.efsane_icon
         }
     }
 }

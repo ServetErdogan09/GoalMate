@@ -194,7 +194,6 @@ class GoalMateApplication : Application(), Configuration.Provider {
                 .build()
 
 
-
             //DENEME
             val oneTimeWorkRequest = OneTimeWorkRequestBuilder<ExpireGroupWorker>()
                 .setInitialDelay(0, TimeUnit.MILLISECONDS) // Hemen çalışacak
@@ -203,9 +202,7 @@ class GoalMateApplication : Application(), Configuration.Provider {
             WorkManager.getInstance(applicationContext).enqueue(oneTimeWorkRequest)
 
 
-
-
-            /*
+/*
             // Her gün gece yarısı çalışacak periyodik worker  24 SAATE BİR ÇALIŞACAK
             val periodicWork = PeriodicWorkRequestBuilder<ExpireGroupWorker>(
                 24, TimeUnit.HOURS // TEST AMAÇLI 15 DK YA ÇEKİLDİ
@@ -220,9 +217,7 @@ class GoalMateApplication : Application(), Configuration.Provider {
                 periodicWork
             )
 
-             */
-
-
+ */
 
 
 

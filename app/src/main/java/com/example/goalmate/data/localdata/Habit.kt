@@ -103,7 +103,7 @@ data class RegistrationData(
     val birthDay: String = "",
     val birthMonth: String = "",
     val birthYear: String = "",
-    val maxAllowedGroups :Int = 3,
+    val maxAllowedGroups :Int = 2,
     val totalPoints: Int = 0
 )
 
@@ -175,10 +175,7 @@ data class GroupCloseVoteState(
     val startTime: Long = 0
 )
 
-// her kullanıcı tammaladığı rozetlerin id si tutlacak
-data class BadgesId(
-    val badgesId: Int = 0
-)
+
 
 @Entity(
     tableName = "motivation_quotes",

@@ -103,6 +103,19 @@ class RegisterViewModel @Inject constructor(
     }
 
 
+
+
+    fun calculateExitPenalty(frequency : String){
+        viewModelScope.launch {
+            try {
+                pointsRepository.calculateExitPenalty(frequency)
+            }catch (e: Exception){
+
+            }
+        }
+    }
+
+
     fun getCurrentUser(context: Context) {
         viewModelScope.launch {
             try {
@@ -144,7 +157,7 @@ class RegisterViewModel @Inject constructor(
                         val joinedGroups = document.get("joinedGroups") as? List<*> ?: emptyList<String>()
                         _joinedGroupsCount.value = joinedGroups.size
                         
-                        val maxAllowed = document.getLong("maxAllowedGroups")?.toInt() ?: 3
+                        val maxAllowed = document.getLong("maxAllowedGroups")?.toInt() ?: 2
                         _maxAllowedGroups.value = maxAllowed
                         
                         Log.d("RegisterViewModel", "User joined groups: ${joinedGroups.size}/$maxAllowed")
@@ -184,7 +197,7 @@ class RegisterViewModel @Inject constructor(
                         }
 
                         // Kullanıcının kendi limitini al
-                        val userMaxAllowedGroups = snapshot.getLong("maxAllowedGroups")?.toInt() ?: 3
+                        val userMaxAllowedGroups = snapshot.getLong("maxAllowedGroups")?.toInt() ?: 2
 
                         Log.d("RegisterViewModel", """
                             Grup Limit Kontrolü:
@@ -496,7 +509,7 @@ class RegisterViewModel @Inject constructor(
                                 "createdAt" to System.currentTimeMillis(),
                                 "joinedGroups" to listOf<String>(),
                                 "fcmToken" to fcmToken,
-                                "maxAllowedGroups" to 3,
+                                "maxAllowedGroups" to 2,
                                 "totalPoints" to 0
                             )
 
@@ -818,7 +831,7 @@ class RegisterViewModel @Inject constructor(
             val userDoc = db.collection("users").document(userId).get().await()
             if (userDoc.exists()) {
                 val joinedGroups = userDoc.get("joinedGroups") as? List<*> ?: emptyList<String>()
-                val maxAllowed = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+                val maxAllowed = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 2
 
                 _joinedGroupsCount.value = joinedGroups.size
                 _maxAllowedGroups.value = maxAllowed

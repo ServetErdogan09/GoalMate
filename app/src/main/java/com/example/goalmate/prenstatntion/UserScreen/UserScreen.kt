@@ -17,6 +17,21 @@ import com.example.goalmate.viewmodel.RegisterViewModel
 import androidx.compose.material.OutlinedTextField
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.google.firebase.auth.FirebaseAuth
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.Card
+import androidx.compose.material.Divider
+import androidx.compose.material.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImage
+import com.example.goalmate.R
+import com.example.goalmate.data.localdata.NextRankInfo
+import com.example.goalmate.utils.Constants
 
 @Composable
 fun UserScreen(
@@ -28,14 +43,11 @@ fun UserScreen(
     var showSignOutConfirmDialog by remember { mutableStateOf(false) }
 
     val auth = FirebaseAuth.getInstance()
-
-    // AuthState'i gözlemle
     val authState by registerViewModel.authState.collectAsState()
 
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Idle -> {
-                // Sadece çıkış yapıldığında WelcomeScreen'e yönlendir
                 if (auth.currentUser == null) {
                     navController.navigate("WelcomeScreen") {
                         popUpTo("UserScreen") { inclusive = true }
@@ -46,58 +58,157 @@ fun UserScreen(
         }
     }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(top = 48.dp)
+            .background(colorResource(R.color.arkaplan))
     ) {
-        // Hata mesajı gösterimi
-        when (val state = authState) {
-            is AuthState.Error -> {
+        // Profile Section
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Profile Image
+            AsyncImage(
+                model = registerViewModel.profileImage.collectAsState().value,
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .border(2.dp, colorResource(R.color.kutubordrengi), CircleShape)
+            )
+            
+            // User Info
+            Column(
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .weight(1f)
+            ) {
                 Text(
-                    text = state.message,
-                    color = Color.Red,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(vertical = 16.dp),
-                    style = MaterialTheme.typography.body1
+                    text = auth.currentUser?.displayName ?: "Kullanıcı",
+                    style = MaterialTheme.typography.h6,
+                    color = MaterialTheme.colors.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = auth.currentUser?.email ?: "",
+                    style = MaterialTheme.typography.body2,
+                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.7f)
                 )
             }
-            else -> {}
         }
 
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Rank Progress Section
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            elevation = 4.dp,
+            backgroundColor = colorResource(R.color.arkaplan)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(
+                            painter = painterResource(Constants.getRankIcon(rank = Constants.getRankFromPoints(registerViewModel.userPoints.collectAsState().value))),
+                            contentDescription = "Current Rank",
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = Constants.getRankFromPoints(registerViewModel.userPoints.collectAsState().value),
+                            style = MaterialTheme.typography.h6,
+                            color = colorResource(R.color.yazirengi)
+                        )
+                    }
+
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Progress Bar
+                val progress = calculateProgress(
+                    currentPoints = registerViewModel.userPoints.collectAsState().value,
+                    nextRankInfo = getNextRankInfo(registerViewModel.userPoints.collectAsState().value)
+                )
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(colorResource(R.color.kutubordrengi).copy(alpha = 0.2f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress)
+                            .height(8.dp)
+                            .background(colorResource(R.color.kutubordrengi))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${registerViewModel.userPoints.collectAsState().value} puan",
+                        style = MaterialTheme.typography.caption,
+                        color = colorResource(R.color.yazirengi)
+                    )
+                    Text(
+                        text = "${getNextRankInfo(registerViewModel.userPoints.collectAsState().value).nextRankMinPoints} puan",
+                        style = MaterialTheme.typography.caption,
+                        color = colorResource(R.color.yazirengi)
+                    )
+                }
+            }
+        }
+
+        // Menu Items
         Column(
             modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // Hesap Silme Butonu
-            Button(
+            MenuItemWithDivider(text = "Bildirimler", icon = R.drawable.notification)
+            MenuItemWithDivider(text = "Hesap Ekleme", icon = R.drawable.bill)
+            MenuItemWithDivider(text = "Profil Düzenleme", icon = R.drawable.edit)
+            MenuItemWithDivider(
+                text = "Rozetler",
+                onClick = { navController.navigate("BadgesScreen") },
+                icon = R.drawable.cup
+            )
+            MenuItemWithDivider(text = "Rütbe Artma", icon = R.drawable.rank)
+            MenuItemWithDivider(text = "Kurallar", icon = R.drawable.rules)
+            MenuItemWithDivider(
+                text = "Hesap Kapatma",
                 onClick = { showDeleteConfirmDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth(0.8f)
-                    .height(50.dp)
-            ) {
-                Text(
-                    text = "Hesap Sil",
-                    style = MaterialTheme.typography.button
-                )
-            }
-
-            // Çıkış Yapma Butonu
-            Button(
+                icon = R.drawable.close
+            )
+            MenuItemWithDivider(
+                text = "Çıkış Yap",
                 onClick = { showSignOutConfirmDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth(0.8f)
-                    .height(50.dp)
-            ) {
-                Text(
-                    text = "Çıkış Yap",
-                    style = MaterialTheme.typography.button
-                )
-            }
+                icon = R.drawable.exit
+            )
         }
     }
 
@@ -211,4 +322,73 @@ fun UserScreen(
             }
         )
     }
+}
+
+@Composable
+private fun MenuItemWithDivider(
+    text: String,
+    onClick: () -> Unit = {},
+    icon: Int
+) {
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = text,
+                tint = colorResource(R.color.kutubordrengi),
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = text,
+                style = MaterialTheme.typography.body1,
+                color = MaterialTheme.colors.onSurface
+            )
+        }
+        Divider(
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
+            thickness = 1.dp
+        )
+    }
+}
+
+
+
+fun getNextRankInfo(currentPoints: Int): NextRankInfo {
+    return when (currentPoints) {
+        in 0..99 -> NextRankInfo("Başlangıç", 100, 100 - currentPoints)
+        in 100..299 -> NextRankInfo("Çaylak", 300, 300 - currentPoints)
+        in 300..599 -> NextRankInfo("Disiplinli", 600, 600 - currentPoints)
+        in 600..999 -> NextRankInfo("Kararlı", 1000, 1000 - currentPoints)
+        in 1000..1599 -> NextRankInfo("Usta", 1600, 1600 - currentPoints)
+        in 1600..2299 -> NextRankInfo("Bilge", 2300, 2300 - currentPoints)
+        in 2300..3199 -> NextRankInfo("Efsane", 3200, 3200 - currentPoints)
+        else -> NextRankInfo("Maksimum", currentPoints, 0)
+    }
+}
+
+fun calculateProgress(currentPoints: Int, nextRankInfo: NextRankInfo): Float {
+    if (nextRankInfo.nextRank == "Maksimum") return 1f
+    
+    val currentRankMinPoints = when (currentPoints) {
+        in 0..99 -> 0
+        in 100..299 -> 100
+        in 300..599 -> 300
+        in 600..999 -> 600
+        in 1000..1599 -> 1000
+        in 1600..2299 -> 1600
+        in 2300..3199 -> 2300
+        else -> 3200
+    }
+    
+    val pointsInCurrentRank = currentPoints - currentRankMinPoints
+    val totalPointsNeededForNextRank = nextRankInfo.nextRankMinPoints - currentRankMinPoints
+    
+    return pointsInCurrentRank.toFloat() / totalPointsNeededForNextRank.toFloat()
 }

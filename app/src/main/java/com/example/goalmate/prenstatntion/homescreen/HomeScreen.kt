@@ -95,17 +95,12 @@ import com.example.goalmate.viewmodel.MotivationQuoteViewModel
 import android.Manifest
 import android.content.pm.PackageManager
 import android.app.Activity
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material.Text
-import androidx.compose.material3.RadioButtonDefaults.colors
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.app.ActivityCompat
 import com.example.goalmate.data.localdata.Badges
 import com.example.goalmate.utils.Constants
-import kotlinx.coroutines.CoroutineScope
 import com.example.goalmate.viewmodel.BadgesViewModel
 
 
@@ -146,7 +141,7 @@ fun HomeScreen(
         viewModel.getCountActiveHabit()
         groupsAddViewModel.getCurrentTotalPoint()
         registerViewModel.getCurrentUser(context)
-        badgesViewModel.incrementAppUsageDays()
+        badgesViewModel.incrementAppUsageDays(context)
     }
 
     LaunchedEffect(totalHabits) {

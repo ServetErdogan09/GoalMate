@@ -272,7 +272,6 @@ class BadgesRepository @Inject constructor(
        if (monthlyGroupCount >=  1 || weeklyGroupCount >= 4 ){
            badgesId.add("R006")
            Log.d("Badges", "Limit rozeti R006 kazanıldı: 1 aylık veya 4 haftalık grup tamamlandı.")
-
        }
 
        //"3'ten 4'e geçiş: 2 tane aylık ya da 8 tane haftalık grup tamamla.
@@ -280,24 +279,24 @@ class BadgesRepository @Inject constructor(
        if (monthlyGroupCount >= 2 || weeklyGroupCount >= 8){
            badgesId.add("R007")
            Log.d("Badges", "Limit rozeti R007 kazanıldı: 2 aylık veya 8 haftalık grup tamamlandı.")
-
        }
 
        //"4'ten 5'e geçiş: 4 tane aylık ya da 16 tane haftalık grup tamamla.",
        if (monthlyGroupCount >= 4  || weeklyGroupCount >= 16){
            badgesId.add("R008")
            Log.d("Badges", "Limit rozeti R008 kazanıldı: 4 aylık veya 16 haftalık grup tamamlandı.")
-
        }
 
        val completedBadges = getCompletedBadgesByIds(badgesId , allBadges)
 
-
        if (completedBadges.isNotEmpty()){
            updateBadgesInBothDatabases(completedBadges)
+           // Yeni kazanılan rozetler için limit güncellemesi yap
+           completedBadges.forEach { badge ->
+               updateUserGroupLimit(badge.id)
+           }
        }
        Log.d("Badges", "Tamamlanan rozet sayısı: ${completedBadges.size}")
-
     }
 
     // Firebase ve locale rozetlerini güncelleme
@@ -316,7 +315,7 @@ class BadgesRepository @Inject constructor(
     }
 
     // Firebase e rozet ekleme
-    suspend fun updateBadgesInFirebase(userId: String, badgeIds: List<String>) {
+    private suspend fun updateBadgesInFirebase(userId: String, badgeIds: List<String>) {
         val userBadgesRef = db.collection("users")
             .document(userId)
             .collection("badges")
@@ -455,6 +454,34 @@ class BadgesRepository @Inject constructor(
             Log.d("UpdateRemovedUserCount", "Atılan kullanıcı sayısı güncellendi: $newKickCount")
         } catch (e: Exception) {
             Log.e("UpdateRemovedUserCount", "Güncelleme hatası: ${e.message}")
+        }
+    }
+
+    private suspend fun updateUserGroupLimit(badgeId: String) {
+        try {
+            val userId = auth.currentUser?.uid ?: return
+            val userRef = db.collection("users").document(userId)
+
+            // Her rozet ID'sine göre limit artışını belirle
+            val limitIncrease = when (badgeId) {
+                "R006" -> 3  // 2'den 3'e geçiş
+                "R007" -> 4  // 3'ten 4'e geçiş
+                "R008" -> 5  // 4'ten 5'e geçiş
+                else -> return
+            }
+
+            // Transaction ile güvenli güncelleme yap
+            db.runTransaction {transaction->
+                val userDoc  = transaction.get(userRef)
+                val currentLimit = userDoc.getLong("maxAllowedGroups") ?:2
+                if (limitIncrease > currentLimit){
+                    transaction.update(userRef,"maxAllowedGroups",limitIncrease)
+                    Log.d("Badges", "Kullanıcı grup limiti güncellendi: $limitIncrease")
+                }
+            }.await()
+
+        } catch (e: Exception) {
+            Log.e("Badges", "Grup limiti güncellenirken hata: ${e.message}")
         }
     }
 }

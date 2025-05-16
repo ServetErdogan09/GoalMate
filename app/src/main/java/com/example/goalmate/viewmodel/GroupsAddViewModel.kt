@@ -147,7 +147,7 @@ class GroupsAddViewModel @Inject constructor(
             // Kullanıcının mevcut grup sayısını ve limitini kontrol et
             val userDoc = db.collection("users").document(currentUserId).get().await()
             val joinedGroups = userDoc.get("joinedGroups") as? List<String> ?: emptyList()
-            val maxAllowedGroups = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 3
+            val maxAllowedGroups = userDoc.getLong("maxAllowedGroups")?.toInt() ?: 2
 
             if (joinedGroups.size >= maxAllowedGroups) {
                 _groupCreationState.value = GroupCreationState.Failure(
@@ -295,7 +295,8 @@ class GroupsAddViewModel @Inject constructor(
     viewModelScope.launch {
         try {
             val currentUserId = auth.currentUser?.uid ?: return@launch
-            val currentTime = System.currentTimeMillis()
+            //val currentTime = System.currentTimeMillis()
+            val currentTime = NetworkUtils.getTime(context)
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(currentTime))
 
             Log.d("HabitCompletion", "Alışkanlık durumu güncelleniyor - isCompleted: $isCompleted")
@@ -448,8 +449,8 @@ class GroupsAddViewModel @Inject constructor(
     @RequiresApi(Build.VERSION_CODES.O)
     fun checkHabitCompletion(groupId: String , context: Context){
         viewModelScope.launch {
-           // val currentServerTime = NetworkUtils.getTime(context = context)
-            val currentServerTime = System.currentTimeMillis()
+            val currentServerTime = NetworkUtils.getTime(context = context)
+           // val currentServerTime = System.currentTimeMillis()
             try {
                 val currentUserId = auth.currentUser?.uid ?: return@launch
                 val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(currentServerTime))
@@ -511,7 +512,7 @@ class GroupsAddViewModel @Inject constructor(
     fun  getCurrentTotalPoint(){
         viewModelScope.launch {
             try {
-            val currentId = auth.currentUser?.uid ?:return@launch
+                val currentId = auth.currentUser?.uid ?:return@launch
                 pointsRepository.getUserPoints(currentId)
             }catch (e:Exception){
                 Log.e("getTotalPoint","total point çekerken hata oluştu")

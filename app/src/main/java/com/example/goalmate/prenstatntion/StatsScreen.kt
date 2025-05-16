@@ -213,43 +213,49 @@ fun MainStatsCard(
                 ) {
                     // Arka plan daireleri
                     CircularProgressIndicator(
-                        progress = 1f,
+                        progress = { 1f },
                         modifier = Modifier.fillMaxSize(),
                         color = Color(0xFF4CAF50).copy(alpha = 0.2f),
-                        strokeWidth = 12.dp
+                        strokeWidth = 12.dp,
+                        trackColor = ProgressIndicatorDefaults.circularIndeterminateTrackColor,
                     )
                     CircularProgressIndicator(
-                        progress = 0.66f,
+                        progress = { 0.66f },
                         modifier = Modifier.fillMaxSize(),
                         color = Color(0xFF2196F3).copy(alpha = 0.2f),
-                        strokeWidth = 12.dp
+                        strokeWidth = 12.dp,
+                        trackColor = ProgressIndicatorDefaults.circularIndeterminateTrackColor,
                     )
                     CircularProgressIndicator(
-                        progress = 0.33f,
+                        progress = { 0.33f },
                         modifier = Modifier.fillMaxSize(),
                         color = Color(0xFF9C27B0).copy(alpha = 0.2f),
-                        strokeWidth = 12.dp
+                        strokeWidth = 12.dp,
+                        trackColor = ProgressIndicatorDefaults.circularIndeterminateTrackColor,
                     )
 
                     // Gerçek değer daireleri
                     val total = (dailyCount + weeklyCount + monthlyCount).toFloat().coerceAtLeast(1f)
                     CircularProgressIndicator(
-                        progress = dailyCount / total,
+                        progress = { dailyCount / total },
                         modifier = Modifier.fillMaxSize(),
                         color = Color(0xFF4CAF50),
-                        strokeWidth = 12.dp
+                        strokeWidth = 12.dp,
+                        trackColor = ProgressIndicatorDefaults.circularIndeterminateTrackColor,
                     )
                     CircularProgressIndicator(
-                        progress = weeklyCount / total,
+                        progress = { weeklyCount / total },
                         modifier = Modifier.fillMaxSize(),
                         color = Color(0xFF2196F3),
-                        strokeWidth = 12.dp
+                        strokeWidth = 12.dp,
+                        trackColor = ProgressIndicatorDefaults.circularIndeterminateTrackColor,
                     )
                     CircularProgressIndicator(
-                        progress = monthlyCount / total,
+                        progress = { monthlyCount / total },
                         modifier = Modifier.fillMaxSize(),
                         color = Color(0xFF9C27B0),
-                        strokeWidth = 12.dp
+                        strokeWidth = 12.dp,
+                        trackColor = ProgressIndicatorDefaults.circularIndeterminateTrackColor,
                     )
 
                     // Merkezdeki toplam sayı
@@ -388,13 +394,22 @@ fun HabitCard(
                 )
             }
 
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.size(40.dp),
-                color = progressColor,
-                strokeWidth = 4.dp,
-                trackColor = progressColor.copy(alpha = 0.2f),
-            )
+            if (habit.completedDays == totalHabit(habit.frequency)){
+                Image(
+                    painter = painterResource(R.drawable.baseline_check_24),
+                    contentDescription = "tamamlandı"
+                )
+
+            }else{
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(40.dp),
+                    color = progressColor,
+                    strokeWidth = 4.dp,
+                    trackColor = progressColor.copy(alpha = 0.2f),
+                )
+            }
+
         }
     }
 }

@@ -149,8 +149,8 @@ fun GroupDetailScreen(
     // Kullanıcı grup üyesi ise showGroupChatScreen sayfasına yönlendirme yap
     LaunchedEffect(groupDetailState) {
 
-        val currentTime = System.currentTimeMillis() // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
-       // val currentTime = NetworkUtils.getTime(context) // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
+       // val currentTime = System.currentTimeMillis() // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
+        val currentTime = NetworkUtils.getTime(context) // burası değiştirip sunucudan alınacak test amaçlı böyle kalsın
         if (groupDetailState is GroupDetailState.Success && currentUserId != null) {
             val group = groupDetailState.group
             // Grup aktif VE kullanıcı üye ise yönlendir
@@ -398,7 +398,7 @@ fun GroupDetailScreen(
                 Button(
                     onClick = {
                         scope.launch {
-                            groupsAddViewModel.leaveGroup(groupId)
+                            groupsAddViewModel.leaveGroup(groupId , userId = "0")
                             showLeaveGroupDialog = false
                             // Verilerin güncellenmesi için kısa bir gecikme ekle
                             kotlinx.coroutines.delay(500)
@@ -816,6 +816,7 @@ fun JoinGroupButton(
 
     Button(
         onClick = {
+
             if (isFull || isGroupActive) {
                 return@Button
             }
