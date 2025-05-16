@@ -29,8 +29,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import com.example.goalmate.R
 import com.example.goalmate.data.localdata.NextRankInfo
+import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 import com.example.goalmate.utils.Constants
 
 @Composable
@@ -41,6 +43,8 @@ fun UserScreen(
 ) {
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showSignOutConfirmDialog by remember { mutableStateOf(false) }
+    val profileImage by registerViewModel.profileImage.collectAsState()
+
 
     val auth = FirebaseAuth.getInstance()
     val authState by registerViewModel.authState.collectAsState()
@@ -72,15 +76,27 @@ fun UserScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Profile Image
-            AsyncImage(
-                model = registerViewModel.profileImage.collectAsState().value,
+            val painter = when {
+                profileImage.startsWith("http") || profileImage.startsWith("content") -> {
+                    rememberAsyncImagePainter(
+                        model = profileImage,
+                        error = painterResource(R.drawable.bildl)
+                    )
+                }
+                else -> {
+                    painterResource(id = getProfilePainter(profileImage, R.drawable.personel))
+                }
+            }
+
+            Image(
+                painter = painter,
                 contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape)
                     .border(2.dp, colorResource(R.color.kutubordrengi), CircleShape)
             )
-            
+
             // User Info
             Column(
                 modifier = Modifier

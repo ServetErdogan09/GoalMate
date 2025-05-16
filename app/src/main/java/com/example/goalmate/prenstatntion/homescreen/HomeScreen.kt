@@ -432,7 +432,7 @@ fun HomeScreen(
                                                 }
                                             }
                                         }
-                                        else -> painterResource(R.drawable.personel)
+                                        else -> painterResource(R.drawable.bildl)
                                     },
                                     contentDescription = "Profile Image",
                                     contentScale = ContentScale.Crop,

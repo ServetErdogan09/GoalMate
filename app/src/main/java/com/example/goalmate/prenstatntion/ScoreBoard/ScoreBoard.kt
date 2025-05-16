@@ -1,6 +1,7 @@
 package com.example.goalmate.prenstatntion.ScoreBoard
 
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +30,8 @@ import com.example.goalmate.data.localdata.GroupHabits
 import com.example.goalmate.viewmodel.ScoreBoardViewModel
 import com.example.goalmate.viewmodel.UserScoreData
 import androidx.navigation.NavController
+import coil.compose.rememberAsyncImagePainter
+import com.example.goalmate.prenstatntion.homescreen.getProfilePainter
 
 @Composable
 fun ScoreBoardScreen(
@@ -194,17 +197,31 @@ fun ScoreBoardItem(userScore: UserScoreData, rank: Int , navController: NavContr
                 )
             }
 
-            // Profile Image
-            AsyncImage(
-                model = userScore.profileImage,
-                contentDescription = "Profil fotoğrafı",
+
+          val painter = rememberAsyncImagePainter(
+              model = when{
+                  userScore.profileImage.startsWith("http") || userScore.profileImage.startsWith("content")->
+                      userScore.profileImage
+                  else->{
+                      getProfilePainter(userScore.profileImage, R.drawable.personel)
+                  }
+              },
+              error = painterResource(R.drawable.bildl),
+              placeholder = painterResource(R.drawable.bildl)
+          )
+
+            Image(
+                painter = painter,
+                contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
                     .border(1.dp, colorResource(id = R.color.kutubordrengi).copy(alpha = 0.2f), CircleShape),
                 contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.bildl)
             )
+
+
+
 
             // User Info
             Column(
