@@ -824,7 +824,105 @@ class RegisterViewModel @Inject constructor(
             }
         }
     }
+    fun updateUserName(newName: String, context: Context, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val user = auth.currentUser
+                if (user == null) {
+                    Log.e("updateUserName", "Kullanıcı bulunamadı, güncelleme yapılamadı")
+                    onComplete(false)
+                    return@launch
+                }
 
+                if (newName.isNotBlank() && newName != userName.value) {
+                    Log.d("updateUserName", "Kullanıcı adı güncelleniyor: $newName")
+
+                    // Firestore güncelleme
+                    db.collection("users").document(user.uid)
+                        .update("name", newName)
+                        .await()
+
+                    // Firebase Authentication displayName güncelleme
+                    user.updateProfile(userProfileChangeRequest {
+                        displayName = newName
+                    }).await()
+
+                    // SharedPreferences güncelleme
+                    val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
+                    sharedPreferences.edit {
+                        putString("user_name", newName)
+                        apply()
+                    }
+                    // StateFlow güncelleme
+                    _userName.value = newName
+
+                    Log.i("updateUserName", "Kullanıcı adı başarıyla güncellendi: $newName")
+                    onComplete(true)
+                } else {
+                    Log.d("updateUserName", "Yeni isim boş veya eski isimle aynı, güncelleme yapılmadı")
+                    onComplete(false)
+                }
+            } catch (e: Exception) {
+                Log.e("updateUserName", "Kullanıcı adı güncellenirken hata oluştu: ${e.message}", e)
+                onComplete(false)
+            }
+        }
+    }
+
+    fun updateUserPassword(
+        oldPassword: String,
+        newPassword: String,
+        onComplete: (String?) -> Unit
+    ) {
+        val user = auth.currentUser ?: run {
+            onComplete("Kullanıcı oturumu bulunamadı")
+            return
+        }
+
+        if (oldPassword.isBlank() || newPassword.isBlank()) {
+            onComplete("Şifreler boş olamaz")
+            return
+        }
+
+        if (newPassword.length < 8) {
+            onComplete("Yeni şifre en az 8 karakter olmalı")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val credential = EmailAuthProvider.getCredential(user.email!!, oldPassword)
+                
+                try {
+                    // Önce mevcut şifreyi doğrula
+                    user.reauthenticate(credential).await()
+                } catch (e: Exception) {
+                    Log.e("UpdatePassword", "Reauthentication error: ${e.message}")
+                    onComplete("Mevcut şifre yanlış")
+                    return@launch
+                }
+
+                try {
+                    // Şifre doğruysa yeni şifreyi güncelle
+                    user.updatePassword(newPassword).await()
+                    onComplete(null) // başarılı
+                } catch (e: Exception) {
+                    Log.e("UpdatePassword", "Password update error: ${e.message}")
+                    val errorMessage = when {
+                        e.message?.contains("network", ignoreCase = true) == true -> 
+                            "İnternet bağlantısı hatası"
+                        e.message?.contains("requires recent authentication", ignoreCase = true) == true ->
+                            "Güvenlik nedeniyle tekrar giriş yapmanız gerekiyor"
+                        else -> "Şifre güncellenirken bir hata oluştu"
+                    }
+                    onComplete(errorMessage)
+                }
+            } catch (e: Exception) {
+                Log.e("UpdatePassword", "General error: ${e.message}")
+                onComplete("Beklenmeyen bir hata oluştu")
+            }
+        }
+    }
     // Kullanıcının grup sayılarını günceller
     suspend fun updateUserGroupCounts(userId: String) {
         try {
