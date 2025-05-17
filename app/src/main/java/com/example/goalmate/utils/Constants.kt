@@ -1,7 +1,7 @@
 package com.example.goalmate.utils
 
 import com.example.goalmate.R
-
+import com.example.goalmate.prenstatntion.AchievementCard.RankInfo
 
 object Constants {
     // Bütün alışkanlıklar için sabit olan değerler her hangi tabloda tutulmasına gerek yok
@@ -10,18 +10,19 @@ object Constants {
     const val weeklyBonusPoints: Int = 40  // Haftalık bonus puan
     const val monthlyBonusPoints: Int = 100  // Aylık bonus puan
 
+    private val rankRanges = listOf(
+        Triple("Acemi", 0, 99),
+        Triple("Başlangıç", 100, 299),
+        Triple("Çaylak", 300, 599),
+        Triple("Disiplinli", 600, 999),
+        Triple("Kararlı", 1000, 1599),
+        Triple("Usta", 1600, 2299),
+        Triple("Bilge", 2300, 3199),
+        Triple("Efsane", 3200, Int.MAX_VALUE)
+    )
 
     fun getRankFromPoints(points: Int): String {
-        return when (points) {
-            in 0..99 -> "Acemi"
-            in 100..299 -> "Başlangıç"
-            in 300..599 -> "Çaylak"
-            in 600..999 -> "Disiplinli"
-            in 1000..1599 -> "Kararlı"
-            in 1600..2299 -> "Usta"
-            in 2300..3199 -> "Bilge"
-            else -> "Efsane"
-        }
+        return rankRanges.first { (_, min, max) -> points in min..max }.first
     }
 
     fun getRankIcon(rank: String): Int {
@@ -35,6 +36,17 @@ object Constants {
             "Bilge" -> R.drawable.rank_7_bilge_icon
             "Efsane" -> R.drawable.efsane_icon
             else -> R.drawable.efsane_icon
+        }
+    }
+
+    fun getAllRanks(): List<RankInfo> {
+        return rankRanges.map { (name, min, max) ->
+            RankInfo(
+                name = name,
+                minPoints = min,
+                maxPoints = max,
+                iconRes = getRankIcon(name)
+            )
         }
     }
 }

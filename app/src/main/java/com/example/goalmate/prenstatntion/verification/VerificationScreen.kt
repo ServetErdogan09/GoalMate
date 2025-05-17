@@ -81,7 +81,7 @@ fun VerificationScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Image(
-            painter = painterResource(id = R.drawable.email_verification_image),
+            painter = painterResource(id = R.drawable.email),
             contentDescription = "Email Verification",
             modifier = Modifier
                 .size(200.dp)

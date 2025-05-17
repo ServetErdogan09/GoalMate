@@ -52,6 +52,7 @@ import com.example.goalmate.R
 import com.example.goalmate.ui.theme.YeniProjeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import com.example.goalmate.data.AuthState
+import com.example.goalmate.prenstatntion.AchievementCard.AchievementScreen
 import com.example.goalmate.prenstatntion.BadgesScreen.BadgesScreen
 import com.example.goalmate.prenstatntion.GroupsListScreen.GroupDetailScreen
 import com.example.goalmate.prenstatntion.ProfilScreen.ProfileScreen
@@ -193,6 +194,7 @@ fun ChangingScreen() {
                 currentRoute != "StatsScreen" &&
                 currentRoute != "BadgesScreen" &&
                 !currentRoute.startsWith("showGroupChatScreen") &&
+                !currentRoute.startsWith("AchievementScreen") &&
                 !currentRoute.startsWith("GroupMembers") &&
                 !currentRoute.startsWith("ScoreBoardScreen") &&
                 !currentRoute.startsWith("ViewProfile")
@@ -208,6 +210,11 @@ fun ChangingScreen() {
 
             composable(route = "LoginScreen") {
                 LoginScreen(navController = navController, context = context)
+            }
+
+
+            composable(route = "AchievementScreen") {
+                AchievementScreen(registerViewModel,navController)
             }
 
             composable(route ="StatsScreen"){

@@ -44,7 +44,7 @@ fun UserScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var showSignOutConfirmDialog by remember { mutableStateOf(false) }
     val profileImage by registerViewModel.profileImage.collectAsState()
-
+    val profileName by registerViewModel.userName.collectAsState()
 
     val auth = FirebaseAuth.getInstance()
     val authState by registerViewModel.authState.collectAsState()
@@ -104,7 +104,7 @@ fun UserScreen(
                     .weight(1f)
             ) {
                 Text(
-                    text = auth.currentUser?.displayName ?: "Kullanıcı",
+                    text = profileName ?: "Kullanıcı",
                     style = MaterialTheme.typography.h6,
                     color = MaterialTheme.colors.onSurface
                 )
@@ -206,14 +206,16 @@ fun UserScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             MenuItemWithDivider(text = "Bildirimler", icon = R.drawable.notification)
-            MenuItemWithDivider(text = "Hesap Ekleme", icon = R.drawable.bill)
+          //  MenuItemWithDivider(text = "Hesap Ekleme", icon = R.drawable.bill)
             MenuItemWithDivider(text = "Profil Düzenleme", icon = R.drawable.edit)
             MenuItemWithDivider(
                 text = "Rozetler",
                 onClick = { navController.navigate("BadgesScreen") },
                 icon = R.drawable.cup
             )
-            MenuItemWithDivider(text = "Rütbe Artma", icon = R.drawable.rank)
+            MenuItemWithDivider(text = "Rütbe Artma", icon = R.drawable.rank , onClick = {
+                navController.navigate("AchievementScreen")
+            })
             MenuItemWithDivider(text = "Kurallar", icon = R.drawable.rules)
             MenuItemWithDivider(
                 text = "Hesap Kapatma",
