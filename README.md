@@ -42,11 +42,9 @@
 - 🧱 Clean Architecture  
 - 📦 MVVM (Model-View-ViewModel)
 
-## 📸 Ekran Görüntüleri
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-> Buraya uygulama içi birkaç ekran görüntüsü eklersen çok etkili olur.
 
----
 
 # 🎯 GoalMate
 
