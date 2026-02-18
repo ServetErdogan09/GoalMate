@@ -4,8 +4,6 @@
 
 **Kişisel alışkanlık takip uygulamanız — takip edin, rekabet edin ve birlikte büyüyün.**
 
----
-
 ## � Hakkında
 
 **GoalMate**, olumlu alışkanlıklar edinmenize ve sürdürmenize yardımcı olan modern bir Android alışkanlık takip uygulamasıdır. Kişisel gelişim, sağlık veya kariyer hedefleriniz olsun; GoalMate sizi rozetler, sıralama sistemi, grup challengeları ve gerçek zamanlı liderlik tablosuyla motive eder.
