@@ -224,7 +224,7 @@ app/src/main/java/com/example/goalmate/
 │   └── repository/         # Repository implementasyonları
 ├── di/                     # Hilt bağımlılık enjeksiyonu modülleri
 ├── extensions/             # UI durum sarmalayıcıları ve extension fonksiyonlar
-├── prenstatntion/          # Composable ekranlar ve UI bileşenleri
+├── presentation/          # Composable ekranlar ve UI bileşenleri
 │   ├── homescreen/
 │   ├── AnalysisScreen/
 │   ├── GroupsListScreen/
