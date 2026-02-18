@@ -19,7 +19,7 @@
 
 | Kurallar | Gruplar | Rozetler | Profil |
 |:--------:|:-------:|:--------:|:------:|
-| ![Kurallar](screenshots/rules.png) | ![Gruplar](screenshots/groups.png) | ![Rozetler](screenshots/badges.png) | ![Profil](screenshots/profile.png) |
+| ![Kurallar](screenshots/rules.jpeg) | ![Gruplar](screenshots/groups.jpeg) | ![Rozetler](screenshots/badges.jpeg) | ![Profil](screenshots/profile.jpeg) |
 
 ---
 
