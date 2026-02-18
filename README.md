@@ -17,17 +17,9 @@
 
 ## 📸 Ekran Görüntüleri
 
-> Aşağıdaki görseller `screenshots/` klasörüne yüklendikten sonra otomatik olarak görünecektir.
-
-| Ana Ekran | Analiz | Gruplar |
-|:---------:|:------:|:-------:|
-| ![Ana Ekran](screenshots/home.png) | ![Analiz](screenshots/analysis.png) | ![Gruplar](screenshots/groups.png) |
-
-| Skor Tablosu | Rozetler | Profil |
-|:------------:|:--------:|:------:|
-| ![Skor Tablosu](screenshots/scoreboard.png) | ![Rozetler](screenshots/badges.png) | ![Profil](screenshots/profile.png) |
-
-> 📌 **Ekran görüntüsü eklemek için:** Projenin kök dizininde `screenshots/` klasörü oluşturup görselleri oraya yükle, ardından `git push` yap.
+| Kurallar | Gruplar | Rozetler | Profil |
+|:--------:|:-------:|:--------:|:------:|
+| ![Kurallar](screenshots/rules.png) | ![Gruplar](screenshots/groups.png) | ![Rozetler](screenshots/badges.png) | ![Profil](screenshots/profile.png) |
 
 ---
 
