@@ -4,34 +4,6 @@
 
 **Kişisel alışkanlık takip uygulamanız — takip edin, rekabet edin ve birlikte büyüyün.**
 
-[![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
-[![Kotlin](https://img.shields.io/badge/Dil-Kotlin-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
-[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Firebase](https://img.shields.io/badge/Backend-Firebase-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Min SDK](https://img.shields.io/badge/Min%20SDK-24-brightgreen)](https://developer.android.com/about/versions/nougat)
-[![Lisans](https://img.shields.io/badge/Lisans-MIT-blue.svg)](LICENSE)
-
-</div>
-
----
-
-## 📸 Ekran Görüntüleri
-
-> Aşağıdaki görseller `screenshots/` klasörüne yüklendikten sonra otomatik olarak görünecektir.
-
-| Ana Ekran | Analiz | Gruplar |
-|:---------:|:------:|:-------:|
-| ![Ana Ekran](screenshots/home.png) | ![Analiz](screenshots/analysis.png) | ![Gruplar](screenshots/groups.png) |
-
-| Skor Tablosu | Rozetler | Profil |
-|:------------:|:--------:|:------:|
-| ![Skor Tablosu](screenshots/scoreboard.png) | ![Rozetler](screenshots/badges.png) | ![Profil](screenshots/profile.png) |
-
-> 📌 **Ekran görüntüsü eklemek için:** Projenin kök dizininde `screenshots/` klasörü oluşturup görselleri oraya yükle, ardından `git push` yap.
-
----
-
-
 ---
 
 ## � Hakkında
