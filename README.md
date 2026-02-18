@@ -1,82 +1,202 @@
-# 🎯 GoalMate
+<div align="center">
 
-![WhatsApp Image 2025-07-09 at 14 06 02 (1)](https://github.com/user-attachments/assets/3da93f1a-ff32-4127-b9f2-e456261e26c1)
-![WhatsApp Image 2025-07-09 at 14 06 02](https://github.com/user-attachments/assets/51b57a1e-3539-47f1-8b11-e9a2ef80a9ad)
-![WhatsApp Image 2025-07-09 at 14 06 03 (1)](https://github.com/user-attachments/assets/ff4950a3-a9cc-40f9-88b0-45cc6815bcc5)
-![WhatsApp Image 2025-07-09 at 14 06 03 (2)](https://github.com/user-attachments/assets/329d2a72-f164-483f-91dd-8ba557ad2418)
-![WhatsApp Image 2025-07-09 at 14 06 03](https://github.com/user-attachments/assets/0c8f35b4-25ca-4f5f-a203-51ea0018fe39)
+# GoalMate
 
+**Kişisel alışkanlık takip uygulamanız — takip edin, rekabet edin ve birlikte büyüyün.**
 
+[![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
+[![Kotlin](https://img.shields.io/badge/Dil-Kotlin-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![Firebase](https://img.shields.io/badge/Backend-Firebase-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Min SDK](https://img.shields.io/badge/Min%20SDK-24-brightgreen)](https://developer.android.com/about/versions/nougat)
+[![Lisans](https://img.shields.io/badge/Lisans-MIT-blue.svg)](LICENSE)
 
+</div>
 
+---
 
+## � Hakkında
 
-🚀 **GoalMate**, kullanıcıların alışkanlıklarını takip edebileceği, gruplar halinde motive olabileceği ve başarılarını rozetlerle ödüllendirebileceği bir mobil uygulamadır.
+**GoalMate**, olumlu alışkanlıklar edinmenize ve sürdürmenize yardımcı olan modern bir Android alışkanlık takip uygulamasıdır. Kişisel gelişim, sağlık veya kariyer hedefleriniz olsun; GoalMate sizi rozetler, sıralama sistemi, grup challengeları ve gerçek zamanlı liderlik tablosuyla motive eder.
 
-## 🇹🇷 Özellikler
+---
 
-- 📆 **Alışkanlık Takibi**  
-  Günlük, haftalık ve aylık alışkanlıklarınızı takip edin.
+## ✨ Özellikler
 
-- 👥 **Gruplar ve Oylama Sistemi**  
-  Gruplar oluşturun, birlikte alışkanlıklar edinin ve grup içi kararları oylayarak alın.
+### 🎯 Alışkanlık Takibi
+- Özel ikon, renk, sıklık (günlük / haftalık / aylık) ve süre ile alışkanlık oluşturma
+- Onay diyaloğuyla sola kaydırarak silme (Swipe-to-Delete)
+- Günlük ilerleme çubuğu ve tamamlanma yüzdesi
+- Tüm alışkanlıklar tamamlandığında Lottie kutlama animasyonu
 
-- 🏅 **Rozet Sistemi**  
-  Başarılarınızı görselleştiren rozetlerle motive olun.
+### 📊 Analiz ve İstatistikler
+- Animasyonlu ilerleme göstergesiyle alışkanlık detay ekranı
+- Tamamlanma oranı, kalan süre ve zorluk rozeti
+- İlerlemeye göre emoji tabanlı ruh hali geri bildirimi
+- Tamamlanan ve tamamlanmayan gün dökümü
 
-- 📊 **İstatistik ve Grafikler**  
-  Gelişiminizi grafiklerle analiz edin.
+### 👥 Grup Challengeları
+- Kategori filtreleriyle tüm açık/özel grupları görüntüleme (Sağlık, Finans, Kariyer, Teknoloji vb.)
+- Üye limiti ve gizlilik ayarlarıyla grup oluşturma veya katılma
+- Gerçek zamanlı grup içi sohbet
+- Gruba özel alışkanlık takibi ve skor tablosu
 
-- 🎯 **Puanlama Sistemi**  
-  Tamamlanan alışkanlıklardan puan kazanın, eksik günlerde puan kaybedin.
+### 🏆 Skor Tablosu
+- Her grup için alışkanlık tamamlanma oranına göre canlı liderlik tablosu
+- İlk 3 üye için Altın / Gümüş / Bronz sıralama göstergeleri
+- Herhangi bir üyenin profiline tıklayarak görüntüleme
 
-- 💬 **Mesajlaşma**  
-  Grup içi ya da bireysel sohbet imkanı.
+### 🥇 Rozetler ve Başarımlar
+- Grup Tamamlama, Limit Artırma, Yönetici, Uygulama Kullanımı kategorilerinde 17+ benzersiz rozet
+- Kazanılmamış rozetler gri gösterilir; kazanıldığında açılır pencere bildirimi
+- Kategoriye göre filtrelenebilir rozet galerisi
 
-## 🔧 Teknolojiler
+### 👤 Profil ve Sıralama
+- Cloudinary bulut depolama ile özelleştirilebilir avatar
+- Puan tabanlı rütbe sistemi ve rütbe ikonları
+- Diğer kullanıcıların genel profillerini görüntüleme
 
-- 🧩 Jetpack Compose  
-- 📡 Firebase (Firestore & Auth)  
-- 🔄 Kotlin Coroutines & Flow  
-- 💉 Hilt (Dependency Injection)  
-- 🧱 Clean Architecture  
-- 📦 MVVM (Model-View-ViewModel)
+### 🔔 Push Bildirimleri
+- Firebase Cloud Messaging (FCM) entegrasyonu
+- Alışkanlık hatırlatıcıları için zamanlanmış tam alarmlar
+- Ayarlar derin bağlantısıyla uygulama içi bildirim izin diyaloğu
 
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---
 
+## �️ Teknoloji Yığını
 
+| Katman | Teknoloji |
+|---|---|
+| **Dil** | Kotlin |
+| **UI** | Jetpack Compose + Material 3 |
+| **Mimari** | MVVM + Clean Architecture |
+| **DI** | Hilt (Dagger) |
+| **Yerel Veritabanı** | Room |
+| **Uzak Veritabanı** | Firebase Firestore |
+| **Kimlik Doğrulama** | Firebase Authentication |
+| **Push Bildirim** | Firebase Cloud Messaging (FCM) |
+| **Görsel Depolama** | Cloudinary |
+| **Görsel Yükleme** | Coil |
+| **Animasyonlar** | Lottie Compose |
+| **Grafikler** | compose-charts (ehsannarmani) |
+| **Arka Plan İşleri** | WorkManager |
+| **Asenkron** | Kotlin Coroutines + Flow |
+| **Ağ** | Volley |
+| **Serileştirme** | Gson |
 
-# 🎯 GoalMate
+---
 
-🚀 **GoalMate** is a mobile app for habit tracking, group-based motivation, and achievement rewards through badges and points.
+## 📱 Ekranlar
 
-## 🇬🇧 Features
+| Ekran | Açıklama |
+|---|---|
+| **Karşılama / Giriş** | Onboarding ve Firebase Auth ile giriş |
+| **Ana Ekran** | Günlük alışkanlık listesi, ilerleme özeti, motivasyon sözü |
+| **Analiz** | Animasyonlu ilerleme ile alışkanlık istatistikleri |
+| **Gruplar Listesi** | Tüm grupları görüntüleme ve filtreleme |
+| **Grup Detayı** | Grup bilgisi, üyeler ve katılma/ayrılma işlemleri |
+| **Grup Sohbeti** | Grup içi gerçek zamanlı mesajlaşma |
+| **Skor Tablosu** | Grup üyeleri için sıralı liderlik tablosu |
+| **Rozetler** | Kategori filtreleriyle başarım galerisi |
+| **Profil** | Kullanıcı bilgisi, rütbe ve profil fotoğrafı |
+| **Profil Düzenleme** | İsim, biyografi ve avatar güncelleme |
+| **Profil Görüntüleme** | Herhangi bir kullanıcının genel profili |
 
-- 📆 **Habit Tracking**  
-  Track your daily, weekly, and monthly habits.
+---
 
-- 👥 **Groups and Voting System**  
-  Create groups, build habits together, and vote on group decisions.
+## � Başlarken
 
-- 🏅 **Badge System**  
-  Earn badges for your achievements and stay motivated.
+### Gereksinimler
 
-- 📊 **Statistics & Charts**  
-  Visualize your progress through interactive charts.
+- Android Studio **Hedgehog** veya üzeri
+- JDK 11+
+- **Authentication**, **Firestore** ve **Cloud Messaging** etkin bir Firebase projesi
+- Cloudinary hesabı (görsel yükleme için)
 
-- 🎯 **Point System**  
-  Gain points for completed tasks and lose points for missed habits.
+### Kurulum
 
-- 💬 **Messaging**  
-  Communicate with group members or in private chats.
+1. **Depoyu klonlayın**
+   ```bash
+   git clone https://github.com/ServetErdogan09/GoalMate.git
+   cd GoalMate
+   ```
 
-## 🔧 Technologies
+2. **Firebase yapılandırmasını ekleyin**
 
-- 🧩 Jetpack Compose  
-- 📡 Firebase (Firestore & Auth)  
-- 🔄 Kotlin Coroutines & Flow  
-- 💉 Hilt (Dependency Injection)  
-- 🧱 Clean Architecture  
-- 📦 MVVM (Model-View-ViewModel)
+   `google-services.json` dosyanızı [Firebase Console](https://console.firebase.google.com)'dan indirin ve şu konuma yerleştirin:
+   ```
+   app/google-services.json
+   ```
 
+3. **Cloudinary'yi yapılandırın**
 
+   Cloudinary kimlik bilgilerinizi `local.properties` dosyasına veya ilgili yapılandırma dosyasına ekleyin:
+   ```
+   CLOUDINARY_CLOUD_NAME=bulut_adiniz
+   CLOUDINARY_API_KEY=api_anahtariniz
+   CLOUDINARY_API_SECRET=api_gizli_anahtariniz
+   ```
+
+4. **Derleyin ve çalıştırın**
+   ```bash
+   ./gradlew assembleDebug
+   ```
+   Ya da projeyi Android Studio'da açıp **Çalıştır ▶** tuşuna basın.
+
+---
+
+## �️ Proje Yapısı
+
+```
+app/src/main/java/com/example/goalmate/
+├── data/
+│   ├── localdata/          # Room entity'leri (Habit, Badge, Group vb.)
+│   └── repository/         # Repository implementasyonları
+├── di/                     # Hilt bağımlılık enjeksiyonu modülleri
+├── extensions/             # UI durum sarmalayıcıları ve extension fonksiyonlar
+├── prenstatntion/          # Composable ekranlar ve UI bileşenleri
+│   ├── homescreen/
+│   ├── AnalysisScreen/
+│   ├── GroupsListScreen/
+│   ├── BadgesScreen/
+│   ├── ScoreBoard/
+│   ├── ProfilScreen/
+│   └── ...
+├── service/                # Firebase Messaging Service
+├── ui/theme/               # Material 3 tema, renkler, tipografi
+├── utils/                  # Sabitler, NetworkUtils, yardımcılar
+├── viewmodel/              # Her ekran için ViewModel'ler
+└── worker/                 # WorkManager arka plan görevleri
+```
+
+---
+
+## � Katkıda Bulunma
+
+Katkılarınızı bekliyoruz! Lütfen şu adımları izleyin:
+
+1. Depoyu fork'layın
+2. Özellik dalı oluşturun: `git checkout -b ozellik/harika-ozellik`
+3. Değişikliklerinizi commit edin: `git commit -m 'Harika özellik eklendi'`
+4. Dala push edin: `git push origin ozellik/harika-ozellik`
+5. Pull Request açın
+
+---
+
+## � Lisans
+
+Bu proje **MIT Lisansı** altında lisanslanmıştır — ayrıntılar için [LICENSE](LICENSE) dosyasına bakın.
+
+---
+
+## 📬 İletişim
+
+**Eyyüp Erdoğan** — [@ServetErdogan09](https://github.com/ServetErdogan09)
+
+Proje Bağlantısı: [https://github.com/ServetErdogan09/GoalMate](https://github.com/ServetErdogan09/GoalMate)
+
+---
+
+<div align="center">
+  <sub>Jetpack Compose ve Firebase ile ❤️ ile yapıldı</sub>
+</div>
