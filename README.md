@@ -23,6 +23,65 @@
 
 ---
 
+## 🏛️ Mimari Diyagram
+
+```mermaid
+graph TD
+    subgraph UI["🖥️ Sunum Katmanı (Jetpack Compose)"]
+        A[HomeScreen] 
+        B[AnalysisScreen]
+        C[GroupListScreen]
+        D[BadgesScreen]
+        E[ScoreBoard]
+        F[ProfilScreen]
+    end
+
+    subgraph VM["⚙️ ViewModel Katmanı (MVVM)"]
+        G[HabitViewModel]
+        H[GroupsAddViewModel]
+        I[BadgesViewModel]
+        J[RegisterViewModel]
+        K[StarCoinViewModel]
+    end
+
+    subgraph DATA["💾 Veri Katmanı"]
+        L[(Room DB\nHabit · Badge · Group)]
+        M[(Firebase Firestore\nKullanıcı · Grup · Skor)]
+        N[Cloudinary\nProfil Görseli]
+    end
+
+    subgraph INFRA["🔧 Altyapı"]
+        O[Firebase Auth]
+        P[Firebase FCM\nPush Bildirim]
+        Q[WorkManager\nArka Plan Görevleri]
+        R[Hilt DI]
+    end
+
+    A --> G
+    B --> G
+    C --> H
+    D --> I
+    E --> H
+    F --> J
+
+    G --> L
+    G --> M
+    H --> M
+    I --> L
+    J --> M
+    J --> N
+    K --> M
+
+    R -->|Inject| VM
+    O -->|Auth| J
+    P -->|Notify| A
+    Q -->|Schedule| G
+```
+
+
+
+---
+
 
 ---
 
